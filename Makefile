@@ -1,4 +1,4 @@
-.PHONY: help db-init db-reset db-status db-migrate db-shell clean test
+.PHONY: help db-init db-reset db-status db-migrate db-shell generate-types clean test
 
 # Default target
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "  make db-migrate       Run pending migrations"
 	@echo "  make db-dry-run       Preview pending migrations without running"
 	@echo "  make db-shell         Open SQLite shell"
+	@echo "  make generate-types   Generate TypeScript types from database schema"
 	@echo "  make clean            Clean generated files"
 	@echo "  make test             Run tests"
 	@echo ""
@@ -19,32 +20,32 @@ help:
 # Initialize database with default users
 db-init:
 	@echo "Initializing database..."
-	python scripts/init_db.py
+	python3 scripts/init_db.py
 
 # Initialize database without default users
 db-init-clean:
 	@echo "Initializing database (no default users)..."
-	python scripts/init_db.py --no-defaults
+	python3 scripts/init_db.py --no-defaults
 
 # Reset database (with confirmation)
 db-reset:
 	@echo "Resetting database..."
-	python scripts/init_db.py --reset
+	python3 scripts/init_db.py --reset
 
 # Show migration status
 db-status:
 	@echo "Checking migration status..."
-	python backend/app/migrations_runner.py status
+	python3 backend/app/migrations_runner.py status
 
 # Run pending migrations
 db-migrate:
 	@echo "Running migrations..."
-	python backend/app/migrations_runner.py
+	python3 backend/app/migrations_runner.py
 
 # Preview pending migrations
 db-dry-run:
 	@echo "Previewing migrations..."
-	python backend/app/migrations_runner.py dry-run
+	python3 backend/app/migrations_runner.py dry-run
 
 # Open SQLite shell
 db-shell:
@@ -54,6 +55,11 @@ db-shell:
 	else \
 		echo "Database does not exist. Run 'make db-init' first."; \
 	fi
+
+# Generate TypeScript types from database schema
+generate-types:
+	@echo "Generating TypeScript types from database schema..."
+	python3 scripts/generate_types.py
 
 # Clean generated files
 clean:
