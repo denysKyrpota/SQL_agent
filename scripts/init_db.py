@@ -3,7 +3,7 @@
 Database Initialization Script
 
 This script initializes the SQLite database for the SQL AI Agent MVP.
-It runs all migrations and optionally creates default users.
+Creates database tables using SQLAlchemy and optionally creates default users.
 
 Usage:
     python scripts/init_db.py                    # Initialize with default users
@@ -14,233 +14,212 @@ Usage:
 import os
 import sys
 import argparse
-import sqlite3
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
 # Add the parent directory to the Python path so we can import from backend
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.app.migrations_runner import run_migrations
+from backend.app.config import get_settings
+from backend.app.database import init_db, reset_db, SessionLocal
+from backend.app.services.auth_service import AuthService
+
+logging.basicConfig(level=logging.INFO)
 
 
-def create_default_users(db_path: str):
+def create_default_users():
     """
-    Create default admin and regular users
-    
+    Create default admin and regular users using SQLAlchemy.
+
     Default credentials:
         Admin: username='admin', password='admin123'
-        User: username='user', password='user123'
-    
+        User: username='testuser', password='testpass123'
+
     WARNING: These are development defaults and should be changed in production!
     """
-    try:
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    except ImportError:
-        print("\n⚠ Warning: passlib not installed. Install it with: pip install passlib[bcrypt]")
-        print("Skipping default user creation.\n")
-        return
-    
     print("\n" + "="*60)
     print("Creating Default Users")
     print("="*60)
-    
-    conn = sqlite3.connect(db_path)
-    
+
+    db = SessionLocal()
+    auth_service = AuthService()
+
     try:
+        from backend.app.models.user import User
+
         # Check if users already exist
-        cursor = conn.execute("select count(*) from users")
-        user_count = cursor.fetchone()[0]
-        
+        user_count = db.query(User).count()
+
         if user_count > 0:
             print(f"\n✓ Database already has {user_count} user(s)")
             print("Skipping default user creation.\n")
             return
-            
+
         # Create admin user
-        admin_password = pwd_context.hash("admin123")
-        conn.execute("""
-            insert into users (username, password_hash, role, active)
-            values (?, ?, ?, ?)
-        """, ("admin", admin_password, "admin", 1))
+        auth_service.create_user(
+            db=db,
+            username="admin",
+            password="admin123",
+            role="admin"
+        )
         print("  ✓ Created admin user (username: admin, password: admin123)")
-        
+
         # Create regular user
-        user_password = pwd_context.hash("user123")
-        conn.execute("""
-            insert into users (username, password_hash, role, active)
-            values (?, ?, ?, ?)
-        """, ("user", user_password, "user", 1))
-        print("  ✓ Created regular user (username: user, password: user123)")
-        
-        conn.commit()
-        
+        auth_service.create_user(
+            db=db,
+            username="testuser",
+            password="testpass123",
+            role="user"
+        )
+        print("  ✓ Created regular user (username: testuser, password: testpass123)")
+
         print("\n⚠  SECURITY WARNING:")
         print("   Default passwords are for development only!")
         print("   Change these passwords immediately in production.\n")
-        
-    except sqlite3.Error as e:
-        conn.rollback()
+
+    except Exception as e:
+        db.rollback()
         print(f"\n✗ Failed to create default users: {e}\n")
         raise
-        
+
     finally:
-        conn.close()
+        db.close()
 
 
-def reset_database(db_path: str):
+def reset_database_confirm():
     """
-    Reset the database by deleting it
-    
+    Reset the database after user confirmation.
+
     WARNING: This permanently deletes all data!
     """
-    if os.path.exists(db_path):
+    settings = get_settings()
+    db_file = settings.database_url.replace("sqlite:///", "")
+
+    if os.path.exists(db_file):
         print("\n" + "="*60)
         print("⚠  WARNING: DATABASE RESET")
         print("="*60)
-        print(f"\nThis will permanently delete: {db_path}")
+        print(f"\nThis will permanently delete: {db_file}")
         response = input("Are you sure you want to continue? (yes/no): ")
-        
+
         if response.lower() == 'yes':
-            os.remove(db_path)
-            print(f"\n✓ Database deleted: {db_path}\n")
+            reset_db()
+            print(f"\n✓ Database reset complete\n")
         else:
             print("\n✗ Database reset cancelled\n")
             sys.exit(0)
     else:
-        print(f"\n✓ Database does not exist: {db_path}\n")
+        print(f"\n✓ Database does not exist\n")
 
 
-def verify_database(db_path: str):
+def verify_database():
     """
-    Verify that the database was initialized correctly
+    Verify that the database was initialized correctly using SQLAlchemy.
     """
     print("\n" + "="*60)
     print("Verifying Database")
     print("="*60)
-    
-    conn = sqlite3.connect(db_path)
-    
+
+    db = SessionLocal()
+
     try:
-        # Check for required tables
-        cursor = conn.execute("""
-            select name from sqlite_master 
-            where type='table' 
-            order by name
-        """)
-        tables = [row[0] for row in cursor.fetchall()]
-        
-        expected_tables = [
-            'users',
-            'sessions',
-            'query_attempts',
-            'query_results_manifest',
-            'schema_snapshots',
-            'kb_examples_index',
-            'metrics_rollup',
-            'schema_migrations'
-        ]
-        
-        print("\nTables:")
-        for table in expected_tables:
-            if table in tables:
-                # Get row count
-                cursor = conn.execute(f"select count(*) from {table}")
-                count = cursor.fetchone()[0]
-                print(f"  ✓ {table:30} ({count} rows)")
-            else:
-                print(f"  ✗ {table:30} (MISSING)")
-        
-        # Check foreign keys are enabled
-        cursor = conn.execute("pragma foreign_keys")
-        fk_enabled = cursor.fetchone()[0]
-        
-        print(f"\nForeign Keys: {'✓ Enabled' if fk_enabled else '✗ Disabled'}")
-        
-        # Count migrations
-        cursor = conn.execute("select count(*) from schema_migrations")
-        migration_count = cursor.fetchone()[0]
-        print(f"Applied Migrations: {migration_count}")
-        
+        from backend.app.models.user import User
+        from backend.app.models.query import QueryAttempt
+
+        # Check users table
+        user_count = db.query(User).count()
+        print(f"\n  ✓ users table: {user_count} rows")
+
+        # Check query_attempts table
+        query_count = db.query(QueryAttempt).count()
+        print(f"  ✓ query_attempts table: {query_count} rows")
+
         print("\n✓ Database verification complete\n")
-        
+
+    except Exception as e:
+        print(f"\n✗ Database verification failed: {e}\n")
+        raise
+
     finally:
-        conn.close()
+        db.close()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Initialize the SQL AI Agent database',
+        description='Initialize the SQL AI Agent database using SQLAlchemy',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
     # Initialize database with default users
     python scripts/init_db.py
-    
+
     # Initialize without default users
     python scripts/init_db.py --no-defaults
-    
+
     # Reset and reinitialize database
     python scripts/init_db.py --reset
         """
     )
-    
-    parser.add_argument(
-        '--db-path',
-        default='./data/app_data/app.db',
-        help='Path to SQLite database file (default: ./data/app_data/app.db)'
-    )
-    
+
     parser.add_argument(
         '--no-defaults',
         action='store_true',
         help='Skip creating default users'
     )
-    
+
     parser.add_argument(
         '--reset',
         action='store_true',
         help='Reset database before initialization (WARNING: deletes all data)'
     )
-    
+
     args = parser.parse_args()
-    
+
+    settings = get_settings()
+
     print("\n" + "="*60)
     print("SQL AI Agent - Database Initialization")
     print("="*60)
-    print(f"Database: {args.db_path}")
+    print(f"Database: {settings.database_url}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*60 + "\n")
-    
+
     try:
         # Reset database if requested
         if args.reset:
-            reset_database(args.db_path)
-        
-        # Run migrations
-        print("Running migrations...")
-        migration_count = run_migrations(db_path=args.db_path)
-        
-        if migration_count == 0 and os.path.exists(args.db_path):
-            print("Database already initialized and up to date.\n")
-        
+            reset_database_confirm()
+
+        # Initialize database (create tables)
+        print("Creating database tables...")
+        init_db()
+        print("✓ Database tables created\n")
+
         # Create default users unless --no-defaults specified
         if not args.no_defaults:
-            create_default_users(args.db_path)
-        
+            create_default_users()
+
         # Verify the database
-        verify_database(args.db_path)
-        
+        verify_database()
+
         print("="*60)
         print("✓ Database initialization complete!")
-        print("="*60 + "\n")
-        
+        print("="*60)
+        print("\nYou can now:")
+        print("  1. Start the server: python -m backend.app.main")
+        print("  2. Test login:")
+        print('     curl -X POST http://localhost:8000/api/auth/login \\')
+        print('       -H "Content-Type: application/json" \\')
+        print('       -d \'{"username": "testuser", "password": "testpass123"}\'')
+        print()
+
     except Exception as e:
         print("\n" + "="*60)
         print("✗ Database initialization failed!")
         print("="*60)
         print(f"\nError: {e}\n")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
