@@ -1,0 +1,47 @@
+/* PerformanceMetrics Styles */
+.performance-metrics {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metric-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Performance color coding */
+.performance-good {
+  color: #10b981; /* Green */
+}
+
+.performance-moderate {
+  color: #f59e0b; /* Amber */
+}
+
+.performance-slow {
+  color: #ef4444; /* Red */
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .performance-metrics {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

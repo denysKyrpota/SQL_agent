@@ -5,102 +5,36 @@
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background-color: white;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
-.results-section h2 {
-  margin-top: 0;
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1rem;
+}
+
+.results-header h2 {
+  margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  color: #111827;
 }
 
-.results-metrics {
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background-color: #f9fafb;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: #6b7280;
-}
+/* Mobile */
+@media (max-width: 768px) {
+  .results-section {
+    padding: 1rem;
+  }
 
-.results-table-wrapper {
-  overflow-x: auto;
-  margin-bottom: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-}
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
 
-.results-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.results-table th,
-.results-table td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.results-table th {
-  background-color: #f9fafb;
-  font-weight: 600;
-  color: #374151;
-  position: sticky;
-  top: 0;
-}
-
-.results-table tbody tr:hover {
-  background-color: #f9fafb;
-}
-
-.results-table tbody tr:nth-child(even) {
-  background-color: #fafafa;
-}
-
-.results-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.results-pagination button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background-color: white;
-  cursor: pointer;
-}
-
-.results-pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.results-pagination button:hover:not(:disabled) {
-  background-color: #f9fafb;
-}
-
-.results-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-.btn-export {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background-color: white;
-  cursor: pointer;
-}
-
-.btn-export:hover {
-  background-color: #f9fafb;
+  .results-header h2 {
+    font-size: 1.125rem;
+  }
 }

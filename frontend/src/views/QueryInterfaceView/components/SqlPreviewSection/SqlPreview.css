@@ -1,0 +1,92 @@
+/* SqlPreview Styles */
+.sql-preview-wrapper {
+  display: flex;
+  background-color: #1e293b;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.sql-line-numbers {
+  padding: 1rem 0.75rem 1rem 1rem;
+  background-color: #0f172a;
+  color: #64748b;
+  text-align: right;
+  user-select: none;
+  flex-shrink: 0;
+  border-right: 1px solid #334155;
+}
+
+.line-number {
+  min-height: 1.6em;
+}
+
+.sql-preview {
+  flex: 1;
+  margin: 0;
+  padding: 1rem;
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.sql-preview code {
+  color: inherit;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* SQL Syntax Highlighting */
+.sql-preview :global(.sql-keyword) {
+  color: #c792ea;
+  font-weight: 600;
+}
+
+.sql-preview :global(.sql-string) {
+  color: #c3e88d;
+}
+
+.sql-preview :global(.sql-number) {
+  color: #f78c6c;
+}
+
+.sql-preview :global(.sql-comment) {
+  color: #546e7a;
+  font-style: italic;
+}
+
+/* Scrollbar styling for code blocks */
+.sql-preview-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.sql-preview-wrapper::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.sql-preview-wrapper::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.sql-preview-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sql-preview-wrapper {
+    font-size: 0.75rem;
+  }
+
+  .sql-line-numbers {
+    padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+  }
+
+  .sql-preview {
+    padding: 0.75rem;
+  }
+}

@@ -1,0 +1,121 @@
+/* ErrorBoundary Styles */
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: #f9fafb;
+}
+
+.error-boundary-content {
+  max-width: 600px;
+  padding: 2rem;
+  text-align: center;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.error-boundary-content h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.error-description {
+  margin: 0 0 1.5rem;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.error-details {
+  margin: 1.5rem 0;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 0.5rem;
+  background-color: #f9fafb;
+}
+
+.error-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  padding: 0.5rem;
+  user-select: none;
+}
+
+.error-details summary:hover {
+  background-color: #f3f4f6;
+}
+
+.error-stack {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.error-actions button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+}
+
+.btn-secondary {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.btn-secondary:hover {
+  background-color: #d1d5db;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .error-boundary-content {
+    padding: 1.5rem;
+  }
+
+  .error-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .error-actions button {
+    width: 100%;
+  }
+}

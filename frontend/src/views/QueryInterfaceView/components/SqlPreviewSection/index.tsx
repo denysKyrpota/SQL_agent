@@ -7,6 +7,8 @@
 
 import React from 'react';
 import type { SqlPreviewSectionProps } from '../../types';
+import Button from '@/components/Button';
+import SqlPreview from './SqlPreview';
 import './SqlPreviewSection.module.css';
 
 const SqlPreviewSection: React.FC<SqlPreviewSectionProps> = ({
@@ -16,30 +18,28 @@ const SqlPreviewSection: React.FC<SqlPreviewSectionProps> = ({
   executing,
 }) => {
   return (
-    <section className="sql-preview-section">
-      <h2>Generated SQL</h2>
+    <section className="sql-preview-section" aria-labelledby="sql-preview-heading">
+      <h2 id="sql-preview-heading">Generated SQL</h2>
       <div className="sql-preview-container">
-        {/* TODO: Implement SqlPreview component with syntax highlighting */}
-        <pre className="sql-preview">
-          <code>{sql}</code>
-        </pre>
+        <SqlPreview sql={sql} showLineNumbers={true} />
       </div>
       <div className="sql-actions">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={onCopy}
-          className="btn-secondary"
+          ariaLabel="Copy SQL to clipboard"
         >
           Copy SQL
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
           onClick={onExecute}
           disabled={executing}
-          className="btn-primary"
+          loading={executing}
+          ariaLabel={executing ? 'Executing query' : 'Execute query'}
         >
-          {executing ? 'Executing...' : 'Execute Query'}
-        </button>
+          Execute Query
+        </Button>
       </div>
     </section>
   );

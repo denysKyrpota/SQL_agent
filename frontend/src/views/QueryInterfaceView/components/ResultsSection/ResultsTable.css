@@ -1,0 +1,138 @@
+/* ResultsTable Styles */
+.results-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.results-table th,
+.results-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.results-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.results-table tbody tr {
+  transition: background-color 0.15s;
+}
+
+.results-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.results-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.results-table tbody tr:nth-child(even):hover {
+  background-color: #f3f4f6;
+}
+
+.results-table td {
+  color: #111827;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Column width classes */
+.col-id {
+  width: 80px;
+  max-width: 80px;
+}
+
+.col-narrow {
+  width: 100px;
+  max-width: 120px;
+}
+
+.col-medium {
+  width: 150px;
+  max-width: 180px;
+}
+
+.col-wide {
+  min-width: 200px;
+  max-width: 300px;
+}
+
+/* NULL value styling */
+.results-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.results-empty {
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.results-empty p {
+  margin: 0;
+}
+
+/* Mobile - Frozen first column */
+@media (max-width: 768px) {
+  .results-table-wrapper {
+    position: relative;
+  }
+
+  .results-table th:first-child,
+  .results-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: white;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .results-table th:first-child {
+    z-index: 11;
+    background-color: #f9fafb;
+  }
+
+  .results-table tbody tr:nth-child(even) td:first-child {
+    background-color: #fafafa;
+  }
+
+  .results-table tbody tr:hover td:first-child {
+    background-color: #f3f4f6;
+  }
+}
+
+/* Scrollbar styling */
+.results-table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.results-table-wrapper::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.results-table-wrapper::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.results-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

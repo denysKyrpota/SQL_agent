@@ -13,6 +13,7 @@ import LoadingIndicator from './components/LoadingIndicator';
 import SqlPreviewSection from './components/SqlPreviewSection';
 import ErrorAlert from './components/ErrorAlert';
 import ResultsSection from './components/ResultsSection';
+import Toast from '@/components/Toast';
 import './QueryInterfaceView.module.css';
 
 /**
@@ -43,6 +44,12 @@ const QueryInterfaceView: React.FC = () => {
     loadingStage: null,
   });
 
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
+
   // Restore saved input on mount
   useEffect(() => {
     const savedInput = sessionStorage.getItem('queryInputText');
@@ -71,8 +78,20 @@ const QueryInterfaceView: React.FC = () => {
 
   // Handle copy SQL to clipboard
   const handleCopy = async () => {
-    // TODO: Implement in next step
-    console.log('Copy SQL');
+    if (!queryState.generatedSql) return;
+
+    try {
+      await navigator.clipboard.writeText(queryState.generatedSql);
+      setToast({
+        message: 'SQL copied to clipboard!',
+        type: 'success',
+      });
+    } catch (error) {
+      setToast({
+        message: 'Failed to copy SQL',
+        type: 'error',
+      });
+    }
   };
 
   // Handle page change
@@ -101,6 +120,15 @@ const QueryInterfaceView: React.FC = () => {
 
   return (
     <main className="query-interface" aria-label="Query Interface">
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+
       <div className="query-interface-container">
         <h1>Ask Your Database</h1>
 

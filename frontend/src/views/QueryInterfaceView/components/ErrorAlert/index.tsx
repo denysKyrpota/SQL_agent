@@ -7,7 +7,18 @@
 
 import React from 'react';
 import type { ErrorAlertProps } from '../../types';
+import Button from '@/components/Button';
+import { getRecoverySuggestion } from '../../utils/errorMessages';
 import './ErrorAlert.module.css';
+
+// Error icons based on type
+const ERROR_ICONS: Record<string, string> = {
+  validation: '⚠️',
+  generation: '🔄',
+  execution: '❌',
+  timeout: '⏱️',
+  network: '🌐',
+};
 
 const ErrorAlert: React.FC<ErrorAlertProps> = ({
   type,
@@ -17,22 +28,33 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({
   onDismiss,
   action,
 }) => {
+  const icon = ERROR_ICONS[type] || '⚠️';
+  const suggestion = getRecoverySuggestion(type);
+
   return (
-    <div role="alert" className={`error-alert error-alert-${type}`}>
-      <div className="error-icon" aria-hidden="true">⚠</div>
+    <div
+      role="alert"
+      className={`error-alert error-alert-${type}`}
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div className="error-icon" aria-hidden="true">
+        {icon}
+      </div>
       <div className="error-content">
         <p className="error-message">{message}</p>
         {detail && <p className="error-detail">{detail}</p>}
+        {suggestion && <p className="error-suggestion">{suggestion}</p>}
       </div>
       <div className="error-actions">
         {action && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={action.onClick}
-            className="error-action-btn"
+            ariaLabel={action.label}
           >
             {action.label}
-          </button>
+          </Button>
         )}
         {dismissible && onDismiss && (
           <button
