@@ -1,0 +1,35 @@
+/* CharacterCount Styles */
+.character-count {
+  font-size: 0.875rem;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.character-count .current {
+  font-weight: 500;
+}
+
+.character-count.warning {
+  color: #f59e0b;
+}
+
+.character-count.danger {
+  color: #f97316;
+}
+
+.character-count.critical {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

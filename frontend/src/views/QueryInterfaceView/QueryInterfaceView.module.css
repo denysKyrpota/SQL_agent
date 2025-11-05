@@ -1,0 +1,38 @@
+/* QueryInterfaceView Main Styles */
+.query-interface {
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: #f9fafb;
+}
+
+.query-interface-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.query-interface-container h1 {
+  margin-top: 0;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .query-interface {
+    padding: 1rem;
+  }
+
+  .query-interface-container {
+    padding: 1rem;
+  }
+
+  .query-interface-container h1 {
+    font-size: 1.5rem;
+  }
+}
