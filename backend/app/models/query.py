@@ -80,8 +80,8 @@ class QueryResultsManifest(Base):
     """
     Query results manifest model.
 
-    Stores metadata for query results pagination and CSV export.
-    Actual result rows are NOT stored in the database.
+    Stores metadata and actual results (as JSON) for query results pagination and CSV export.
+    For MVP, results are stored in JSON columns (acceptable for result sets up to 10K rows).
     """
 
     __tablename__ = "query_results_manifest"
@@ -92,6 +92,10 @@ class QueryResultsManifest(Base):
         ForeignKey("query_attempts.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+    # Result data (stored as JSON for MVP)
+    columns_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    results_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Result metadata
     total_rows: Mapped[int | None] = mapped_column(Integer, nullable=True)

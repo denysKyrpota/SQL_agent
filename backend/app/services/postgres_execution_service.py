@@ -18,7 +18,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError, DatabaseError
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
-from backend.app.models.query import QueryAttempt, ResultsManifest
+from backend.app.models.query import QueryAttempt, QueryResultsManifest
 from backend.app.schemas.common import QueryStatus
 
 logger = logging.getLogger(__name__)
@@ -336,9 +336,9 @@ class PostgresExecutionService:
         db: Session,
         query_attempt_id: int,
         result: QueryResult
-    ) -> ResultsManifest:
+    ) -> QueryResultsManifest:
         """
-        Create ResultsManifest for paginated results.
+        Create QueryResultsManifest for paginated results.
 
         Stores full results as JSON for later retrieval.
 
@@ -348,7 +348,7 @@ class PostgresExecutionService:
             result: Query execution result
 
         Returns:
-            ResultsManifest: Created manifest
+            QueryResultsManifest: Created manifest
         """
         # Calculate pagination
         page_size = 500  # As per spec
@@ -359,8 +359,8 @@ class PostgresExecutionService:
         rows_json = json.dumps(result.rows)
 
         # Create manifest
-        manifest = ResultsManifest(
-            query_attempt_id=query_attempt_id,
+        manifest = QueryResultsManifest(
+            attempt_id=query_attempt_id,
             columns_json=columns_json,
             results_json=rows_json,
             total_rows=result.total_rows,

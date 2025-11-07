@@ -13,7 +13,7 @@ from typing import Any, Generator
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from backend.app.models.query import QueryAttempt, ResultsManifest
+from backend.app.models.query import QueryAttempt, QueryResultsManifest
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ class ExportService:
             raise ValueError(f"Query attempt {query_attempt_id} not found")
 
         # Get results manifest
-        manifest = db.query(ResultsManifest).filter(
-            ResultsManifest.query_attempt_id == query_attempt_id
+        manifest = db.query(QueryResultsManifest).filter(
+            QueryResultsManifest.attempt_id == query_attempt_id
         ).first()
 
         if not manifest:
@@ -211,8 +211,8 @@ class ExportService:
                 "warning": None
             }
         """
-        manifest = db.query(ResultsManifest).filter(
-            ResultsManifest.query_attempt_id == query_attempt_id
+        manifest = db.query(QueryResultsManifest).filter(
+            QueryResultsManifest.attempt_id == query_attempt_id
         ).first()
 
         if not manifest:
