@@ -1,25 +1,59 @@
-# FastAPI and Server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+# =============================================================================
+# SQL AI Agent - Python Dependencies
+# =============================================================================
+# Python 3.9+ required (tested with 3.12.3)
+# Install with: pip install -r requirements.txt
+# =============================================================================
 
-# Database
-sqlalchemy==2.0.25
+# -----------------------------------------------------------------------------
+# FastAPI and Web Server
+# -----------------------------------------------------------------------------
+fastapi==0.115.0              # Modern web framework with automatic API docs
+uvicorn[standard]==0.32.0     # ASGI server with WebSocket and HTTP/2 support
+python-multipart==0.0.18      # Form data parsing for file uploads
 
-# Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# -----------------------------------------------------------------------------
+# Database and ORM
+# -----------------------------------------------------------------------------
+sqlalchemy==2.0.36            # SQL toolkit and ORM
+alembic==1.13.3               # Database migration tool (optional, using custom migrations)
+psycopg2-binary==2.9.10       # PostgreSQL adapter for Python
+sqlparse==0.5.3               # SQL parser for validation
 
-# Password Hashing
-bcrypt==4.1.2
+# -----------------------------------------------------------------------------
+# Validation and Settings
+# -----------------------------------------------------------------------------
+pydantic==2.10.3              # Data validation using Python type hints
+pydantic-settings==2.6.1      # Settings management for Pydantic
 
+# -----------------------------------------------------------------------------
+# Authentication and Security
+# -----------------------------------------------------------------------------
+bcrypt==4.2.1                 # Password hashing (session-based auth)
+
+# -----------------------------------------------------------------------------
 # OpenAI Integration
-openai==1.10.0
+# -----------------------------------------------------------------------------
+openai==1.57.4                # OpenAI API client for SQL generation
 
-# Environment Variables
-python-dotenv==1.0.0
+# -----------------------------------------------------------------------------
+# Environment and Configuration
+# -----------------------------------------------------------------------------
+python-dotenv==1.0.1          # Load environment variables from .env file
 
-# Development
-pytest==7.4.4
-pytest-asyncio==0.23.3
-httpx==0.26.0
+# -----------------------------------------------------------------------------
+# Testing
+# -----------------------------------------------------------------------------
+pytest==8.3.4                 # Testing framework
+pytest-asyncio==0.24.0        # AsyncIO support for pytest
+httpx==0.28.1                 # HTTP client for testing API endpoints
+pytest-cov==6.0.0             # Code coverage reporting
+
+# -----------------------------------------------------------------------------
+# Development Tools (Optional)
+# -----------------------------------------------------------------------------
+# Uncomment for enhanced development experience:
+black==24.10.0              # Code formatter
+flake8==7.1.1               # Linting
+mypy==1.13.0                # Static type checking
+isort==5.13.2               # Import sorting
