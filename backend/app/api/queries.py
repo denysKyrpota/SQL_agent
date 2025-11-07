@@ -186,7 +186,7 @@ async def create_query(
             extra={
                 "attempt_id": result.id,
                 "user_id": user.id,
-                "status": result.status.value,
+                "status": result.status if isinstance(result.status, str) else result.status.value,
                 "generation_ms": result.generation_ms,
             },
         )
@@ -280,7 +280,19 @@ async def get_query(
 
     logger.info(f"GET /queries/{id} - User {user.id} retrieved query")
 
-    return QueryAttemptDetailResponse.from_orm(query)
+    return QueryAttemptDetailResponse(
+        id=query.id,
+        natural_language_query=query.natural_language_query,
+        generated_sql=query.generated_sql,
+        status=QueryStatus(query.status) if isinstance(query.status, str) else query.status,
+        created_at=query.created_at.isoformat() + "Z" if query.created_at else None,
+        generated_at=query.generated_at.isoformat() + "Z" if query.generated_at else None,
+        generation_ms=query.generation_ms,
+        error_message=query.error_message,
+        executed_at=query.executed_at.isoformat() + "Z" if query.executed_at else None,
+        execution_ms=query.execution_ms,
+        original_attempt_id=query.original_attempt_id if hasattr(query, 'original_attempt_id') else None,
+    )
 
 
 @router.get("", response_model=QueryListResponse, summary="List query attempts")
@@ -347,7 +359,15 @@ async def list_queries(
 
     # Convert to simplified responses
     simplified_queries = [
-        SimplifiedQueryAttempt.from_orm(q) for q in query_attempts
+        SimplifiedQueryAttempt(
+            id=q.id,
+            natural_language_query=q.natural_language_query,
+            status=QueryStatus(q.status) if isinstance(q.status, str) else q.status,
+            created_at=q.created_at.isoformat() + "Z" if q.created_at else None,
+            executed_at=q.executed_at.isoformat() + "Z" if q.executed_at else None,
+            generation_ms=q.generation_ms if hasattr(q, 'generation_ms') else None,
+        )
+        for q in query_attempts
     ]
 
     # Calculate pagination metadata

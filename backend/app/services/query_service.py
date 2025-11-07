@@ -150,8 +150,8 @@ class QueryService:
                 natural_language_query=query_attempt.natural_language_query,
                 generated_sql=query_attempt.generated_sql,
                 status=QueryStatus(query_attempt.status),
-                created_at=query_attempt.created_at,
-                generated_at=query_attempt.generated_at,
+                created_at=query_attempt.created_at.isoformat() + "Z" if query_attempt.created_at else None,
+                generated_at=query_attempt.generated_at.isoformat() + "Z" if query_attempt.generated_at else None,
                 generation_ms=query_attempt.generation_ms,
                 error_message=query_attempt.error_message,
             )
