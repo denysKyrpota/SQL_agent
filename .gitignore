@@ -36,6 +36,9 @@ ENV/
 data/app_data/*.db
 data/app_data/*.db-shm
 data/app_data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
 
 # Exports
 data/exports/*
