@@ -12,6 +12,7 @@ const Button: React.FC<ButtonProps> = ({
   children,
   onClick,
   variant = 'primary',
+  size = 'medium',
   disabled = false,
   loading = false,
   type = 'button',
@@ -28,6 +29,7 @@ const Button: React.FC<ButtonProps> = ({
   const classNames = [
     'btn',
     `btn-${variant}`,
+    `btn-${size}`,
     fullWidth ? 'btn-full-width' : '',
     loading ? 'btn-loading' : '',
   ].filter(Boolean).join(' ');

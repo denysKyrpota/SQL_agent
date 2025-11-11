@@ -197,12 +197,18 @@ export interface PaginationProps {
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 /**
+ * Button size types
+ */
+export type ButtonSize = 'small' | 'medium' | 'large';
+
+/**
  * Props for Button component
  */
 export interface ButtonProps {
   children: React.ReactNode;
   onClick: () => void;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
   type?: 'button' | 'submit';
