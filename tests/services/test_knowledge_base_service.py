@@ -233,13 +233,13 @@ class TestLoadExamples:
     @patch('pathlib.Path.glob')
     def test_load_examples_success(self, mock_glob, mock_exists):
         """Test loading multiple SQL example files."""
+        from pathlib import Path
+
         mock_exists.return_value = True
 
-        # Create mock SQL files
-        mock_file1 = MagicMock()
-        mock_file1.name = "query1.sql"
-        mock_file2 = MagicMock()
-        mock_file2.name = "query2.sql"
+        # Use real Path objects for sorting to work
+        mock_file1 = Path("query1.sql")
+        mock_file2 = Path("query2.sql")
 
         mock_glob.return_value = [mock_file1, mock_file2]
 
@@ -281,12 +281,13 @@ class TestLoadExamples:
     @patch('pathlib.Path.glob')
     def test_load_examples_skips_invalid_files(self, mock_glob, mock_exists):
         """Test that invalid files are skipped with warning."""
+        from pathlib import Path
+
         mock_exists.return_value = True
 
-        mock_file1 = MagicMock()
-        mock_file1.name = "valid.sql"
-        mock_file2 = MagicMock()
-        mock_file2.name = "invalid.sql"
+        # Use real Path objects for sorting to work
+        mock_file1 = Path("valid.sql")
+        mock_file2 = Path("invalid.sql")
 
         mock_glob.return_value = [mock_file1, mock_file2]
 
@@ -294,13 +295,13 @@ class TestLoadExamples:
 
         # First file succeeds, second fails
         service._load_example_file = MagicMock(side_effect=[
+            Exception("File read error"),  # invalid.sql comes first alphabetically
             KBExample(
                 filename="valid.sql",
                 title="Valid",
                 description="Valid query",
                 sql="SELECT 1;",
             ),
-            Exception("File read error")
         ])
 
         examples = service.load_examples()

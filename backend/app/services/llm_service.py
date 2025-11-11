@@ -392,17 +392,18 @@ Your SQL query:"""
         for remove_str in ["```", "sql", "SELECT", "FROM"]:
             cleaned = cleaned.replace(remove_str, "")
 
-        # Split by common delimiters
+        # Split by common delimiters (prioritize comma and newline over space)
         table_names = []
-        for delimiter in [",", "\n", ";", " "]:
+        for delimiter in [",", "\n", ";"]:
             if delimiter in cleaned:
                 parts = [p.strip().lower() for p in cleaned.split(delimiter)]
                 table_names = [p for p in parts if p and not p.isspace()]
                 break
 
+        # If no delimiter found, try splitting by spaces (but filter more strictly)
         if not table_names:
-            # Try treating whole response as single table name
-            table_names = [cleaned.lower()]
+            parts = [p.strip().lower() for p in cleaned.split()]
+            table_names = [p for p in parts if p and not p.isspace()]
 
         # Validate against actual table names
         valid_table_names_lower = {name.lower(): name for name in valid_table_names}
@@ -410,10 +411,18 @@ Your SQL query:"""
 
         for name in table_names:
             name_lower = name.lower().strip()
+            # Check if this candidate matches a valid table name exactly
             if name_lower in valid_table_names_lower:
                 validated.append(valid_table_names_lower[name_lower])
             else:
-                logger.warning(f"LLM suggested invalid table name: '{name}'")
+                # Also check if any valid table name is contained in this candidate
+                # This handles cases like "i recommend: users" -> "users"
+                for valid_name_lower, valid_name in valid_table_names_lower.items():
+                    if valid_name_lower in name_lower.split():
+                        validated.append(valid_name)
+                        break
+                else:
+                    logger.warning(f"LLM suggested invalid table name: '{name}'")
 
         if not validated:
             logger.error(f"No valid table names found in response: {response_text}")

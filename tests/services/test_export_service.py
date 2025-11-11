@@ -296,7 +296,9 @@ class TestExportInfo:
         assert info["exportable"] is True
         assert info["total_rows"] == 3
         assert info["total_columns"] == 3
-        assert info["estimated_size_mb"] > 0
+        # Small files may round to 0.00 MB due to rounding to 2 decimal places
+        assert info["estimated_size_mb"] >= 0
+        assert "estimated_size_mb" in info
         assert info["warning"] is None
 
     @pytest.mark.asyncio

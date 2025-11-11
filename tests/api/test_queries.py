@@ -25,10 +25,8 @@ from backend.app.models.user import User
 class TestCreateQuery:
     """Tests for POST /api/queries endpoint."""
 
-    @patch("backend.app.api.queries.query_service.create_query_attempt")
-    async def test_create_query_success(
+    def test_create_query_success(
         self,
-        mock_create,
         authenticated_client: TestClient,
         test_user: User,
         sample_query_attempt: QueryAttempt,
@@ -37,9 +35,10 @@ class TestCreateQuery:
         from backend.app.schemas.queries import QueryAttemptResponse
         from backend.app.schemas.common import QueryStatus
         from datetime import datetime
+        from unittest.mock import AsyncMock, patch
 
         # Mock the service response with proper DTO
-        mock_create.return_value = QueryAttemptResponse(
+        mock_response = QueryAttemptResponse(
             id=sample_query_attempt.id,
             natural_language_query=sample_query_attempt.natural_language_query,
             generated_sql=sample_query_attempt.generated_sql,
@@ -50,16 +49,19 @@ class TestCreateQuery:
             error_message=None,
         )
 
-        response = authenticated_client.post(
-            "/api/queries",
-            json={"natural_language_query": "Show me all active users"},
-        )
+        with patch("backend.app.api.queries.query_service.create_query_attempt", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = mock_response
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["natural_language_query"] == "Show me all active users"
-        assert "generated_sql" in data
-        assert data["status"] == "not_executed"
+            response = authenticated_client.post(
+                "/api/queries",
+                json={"natural_language_query": "Show me all active users"},
+            )
+
+            assert response.status_code == 201
+            data = response.json()
+            assert data["natural_language_query"] == "Show me all active users"
+            assert "generated_sql" in data
+            assert data["status"] == "not_executed"
 
     def test_create_query_unauthenticated(self, client: TestClient):
         """Test query creation without authentication."""
@@ -277,15 +279,16 @@ class TestListQueries:
 class TestExecuteQuery:
     """Tests for POST /api/queries/{id}/execute endpoint."""
 
-    @patch("backend.app.api.queries.postgres_service.execute_query_attempt")
-    async def test_execute_query_success(
+    def test_execute_query_success(
         self,
-        mock_execute,
         authenticated_client: TestClient,
         sample_query_attempt: QueryAttempt,
+        test_db: Session,
     ):
         """Test successful query execution."""
         from backend.app.services.postgres_execution_service import QueryResult
+        from unittest.mock import AsyncMock, patch
+        from datetime import datetime
 
         # Mock successful execution
         mock_result = QueryResult(
@@ -294,17 +297,27 @@ class TestExecuteQuery:
             total_rows=2,
             execution_ms=150,
         )
-        mock_execute.return_value = mock_result
 
-        response = authenticated_client.post(
-            f"/api/queries/{sample_query_attempt.id}/execute"
-        )
+        async def mock_execute_with_update(db, query):
+            # Update the query object as the real service would
+            query.executed_at = datetime.utcnow()
+            query.execution_ms = 150
+            query.status = "success"
+            db.commit()
+            return mock_result
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "success"
-        assert "results" in data
-        assert data["results"]["total_rows"] == 2
+        with patch("backend.app.api.queries.postgres_service.execute_query_attempt", new_callable=AsyncMock) as mock_execute:
+            mock_execute.side_effect = mock_execute_with_update
+
+            response = authenticated_client.post(
+                f"/api/queries/{sample_query_attempt.id}/execute"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "success"
+            assert "results" in data
+            assert data["results"]["total_rows"] == 2
 
     def test_execute_query_not_found(self, authenticated_client: TestClient):
         """Test executing non-existent query."""
@@ -467,50 +480,84 @@ class TestExportResults:
 
         assert response.status_code == 404
 
-    @patch("backend.app.api.queries.export_service.export_to_csv")
-    async def test_export_results_too_large(
+    def test_export_results_too_large(
         self,
-        mock_export,
         authenticated_client: TestClient,
         executed_query_with_results: tuple[QueryAttempt, QueryResultsManifest],
     ):
         """Test exporting results that exceed size limit."""
         from backend.app.services.export_service import ExportTooLargeError
+        from unittest.mock import AsyncMock, patch
 
         query, _ = executed_query_with_results
 
-        # Mock export service to raise error
-        mock_export.side_effect = ExportTooLargeError(
-            "Result set too large: 15000 rows. Maximum is 10000 rows."
-        )
+        with patch("backend.app.api.queries.export_service.export_to_csv", new_callable=AsyncMock) as mock_export:
+            # Mock export service to raise error
+            mock_export.side_effect = ExportTooLargeError(
+                "Result set too large: 15000 rows. Maximum is 10000 rows."
+            )
 
-        response = authenticated_client.get(f"/api/queries/{query.id}/export")
+            response = authenticated_client.get(f"/api/queries/{query.id}/export")
 
-        assert response.status_code == 413
+            assert response.status_code == 413
 
 
 class TestRerunQuery:
     """Tests for POST /api/queries/{id}/rerun endpoint."""
 
-    @patch("backend.app.api.queries.query_service.create_query_attempt")
-    async def test_rerun_query_success(
+    def test_rerun_query_success(
         self,
-        mock_create,
         authenticated_client: TestClient,
         sample_query_attempt: QueryAttempt,
+        test_db: Session,
+        test_user: User,
     ):
         """Test successful query re-run."""
-        # Mock the service response
-        mock_create.return_value = sample_query_attempt
+        from unittest.mock import AsyncMock, patch
+        from backend.app.schemas.queries import QueryAttemptResponse
+        from backend.app.schemas.common import QueryStatus
+        from datetime import datetime
 
-        response = authenticated_client.post(
-            f"/api/queries/{sample_query_attempt.id}/rerun"
+        # Mock the service response
+        mock_response = QueryAttemptResponse(
+            id=sample_query_attempt.id + 1,  # New attempt ID
+            natural_language_query=sample_query_attempt.natural_language_query,
+            generated_sql=sample_query_attempt.generated_sql,
+            status=QueryStatus.NOT_EXECUTED,
+            created_at=datetime.utcnow().isoformat() + "Z",
+            generated_at=datetime.utcnow().isoformat() + "Z",
+            generation_ms=1500,
+            error_message=None,
         )
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["original_attempt_id"] == sample_query_attempt.id
-        assert data["natural_language_query"] == sample_query_attempt.natural_language_query
+        async def mock_create_with_db_record(db, user_id, request):
+            # Create actual database record so the endpoint can query it
+            new_query = QueryAttempt(
+                id=sample_query_attempt.id + 1,
+                user_id=user_id,
+                natural_language_query=request.natural_language_query,
+                generated_sql=sample_query_attempt.generated_sql,
+                status="not_executed",
+                created_at=datetime.utcnow(),
+                generated_at=datetime.utcnow(),
+                generation_ms=1500,
+            )
+            db.add(new_query)
+            db.commit()
+            db.refresh(new_query)
+            return mock_response
+
+        with patch("backend.app.api.queries.query_service.create_query_attempt", new_callable=AsyncMock) as mock_create:
+            mock_create.side_effect = mock_create_with_db_record
+
+            response = authenticated_client.post(
+                f"/api/queries/{sample_query_attempt.id}/rerun"
+            )
+
+            assert response.status_code == 201
+            data = response.json()
+            assert data["original_attempt_id"] == sample_query_attempt.id
+            assert data["natural_language_query"] == sample_query_attempt.natural_language_query
 
     def test_rerun_query_not_found(self, authenticated_client: TestClient):
         """Test re-running non-existent query."""

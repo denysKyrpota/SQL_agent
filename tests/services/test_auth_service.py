@@ -224,19 +224,25 @@ class TestCreateSession:
 
     def test_create_session_expiration_time(self, test_db: Session, test_user: User):
         """Test session expiration is set correctly."""
-        before_creation = datetime.utcnow()
-        session = AuthService.create_session(
-            db=test_db,
-            user=test_user
-        )
-        after_creation = datetime.utcnow()
+        from unittest.mock import patch, MagicMock
 
-        # Session should expire approximately session_expiration_hours from now
-        # (default is configured in test settings)
-        expected_min = before_creation + timedelta(hours=0, minutes=59)
-        expected_max = after_creation + timedelta(hours=2)
+        # Mock settings to use 1 hour expiration
+        mock_settings = MagicMock()
+        mock_settings.session_expiration_hours = 1
 
-        assert expected_min <= session.expires_at <= expected_max
+        with patch('backend.app.services.auth_service.settings', mock_settings):
+            before_creation = datetime.utcnow()
+            session = AuthService.create_session(
+                db=test_db,
+                user=test_user
+            )
+            after_creation = datetime.utcnow()
+
+            # Session should expire approximately 1 hour from now
+            expected_min = before_creation + timedelta(hours=0, minutes=59)
+            expected_max = after_creation + timedelta(hours=1, minutes=1)
+
+            assert expected_min <= session.expires_at <= expected_max
 
 
 class TestValidateSession:

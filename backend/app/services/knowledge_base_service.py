@@ -202,7 +202,11 @@ class KnowledgeBaseService:
 
         # Remove first line if it's a title (doesn't start with SELECT, --, etc.)
         lines = cleaned.split('\n')
-        if lines and not lines[0].strip().upper().startswith(('SELECT', 'WITH', '--')):
+        # Skip empty lines at the beginning
+        while lines and not lines[0].strip():
+            lines = lines[1:]
+        # Remove first non-empty line if it's a title
+        if lines and not lines[0].strip().upper().startswith(('SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', '--')):
             lines = lines[1:]
 
         cleaned = '\n'.join(lines).strip()
