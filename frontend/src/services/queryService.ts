@@ -10,6 +10,8 @@ import type {
   ExecuteQueryResponse,
   QueryResultsResponse,
   QueryResultsParams,
+  QueryListParams,
+  QueryListResponse,
 } from '@/types/api';
 
 /**
@@ -98,4 +100,31 @@ export async function rerunQuery(
   queryId: number
 ): Promise<QueryAttemptResponse> {
   return apiClient.post<QueryAttemptResponse>(`/queries/${queryId}/rerun`);
+}
+
+/**
+ * Get list of query attempts with optional pagination and filtering
+ * GET /queries
+ */
+export async function listQueries(
+  params: QueryListParams = {}
+): Promise<QueryListResponse> {
+  const queryParams = new URLSearchParams();
+
+  if (params.page) {
+    queryParams.append('page', params.page.toString());
+  }
+
+  if (params.limit) {
+    queryParams.append('limit', params.limit.toString());
+  }
+
+  if (params.status) {
+    queryParams.append('status', params.status);
+  }
+
+  const queryString = queryParams.toString();
+  const endpoint = `/queries${queryString ? `?${queryString}` : ''}`;
+
+  return apiClient.get<QueryListResponse>(endpoint);
 }
