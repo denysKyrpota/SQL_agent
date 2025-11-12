@@ -1,80 +1,65 @@
 /**
- * App Header - Navigation header with user menu
+ * App Header - Minimal header with user menu
  */
 
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import Button from '@/components/Button';
 import './AppHeader.module.css';
 
 const AppHeader: React.FC = () => {
-  const location = useLocation();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await logout();
   };
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   return (
     <header className="app-header">
       <div className="app-header-container">
-        {/* Logo / Brand */}
-        <div className="app-header-brand">
-          <Link to="/" className="brand-link">
-            <span className="brand-icon">🤖</span>
-            <span className="brand-name">SQL AI Agent</span>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="app-header-nav">
-          <Link
-            to="/"
-            className={`nav-link ${isActive('/') ? 'active' : ''}`}
-          >
-            New Query
-          </Link>
-          <Link
-            to="/history"
-            className={`nav-link ${isActive('/history') ? 'active' : ''}`}
-          >
-            History
-          </Link>
-        </nav>
+        {/* Logo */}
+        <Link to="/" className="app-header-logo">
+          SQL AI
+        </Link>
 
         {/* User Menu */}
-        <div className="app-header-user">
+        <div className="app-header-actions" ref={menuRef}>
           <button
-            className="user-button"
+            className="user-menu-trigger"
             onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="User menu"
             aria-expanded={showUserMenu}
           >
-            <span className="user-icon">👤</span>
-            <span className="user-name">{user?.username}</span>
-            <span className="user-arrow">▼</span>
+            {user?.username}
           </button>
 
           {showUserMenu && (
-            <div className="user-menu">
-              <div className="user-menu-header">
-                <div className="user-menu-name">{user?.username}</div>
-                <div className="user-menu-role">
-                  {user?.role === 'admin' ? '👑 Admin' : '👤 User'}
-                </div>
-              </div>
+            <div className="user-menu-dropdown">
+              <Link to="/history" className="user-menu-item" onClick={() => setShowUserMenu(false)}>
+                Query History
+              </Link>
               <div className="user-menu-divider" />
-              <button
-                className="user-menu-item"
-                onClick={handleLogout}
-              >
-                🚪 Logout
+              <button className="user-menu-item" onClick={handleLogout}>
+                Sign out
               </button>
             </div>
           )}

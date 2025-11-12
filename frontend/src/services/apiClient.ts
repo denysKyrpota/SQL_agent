@@ -7,7 +7,7 @@ import { APIError } from '@/types/api';
 /**
  * Base API configuration
  */
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * HTTP request options
@@ -107,17 +107,7 @@ async function apiRequest<T>(
 
   const response = await fetchWithTimeout(url, mergedOptions);
 
-  // Handle 401 Unauthorized - redirect to login
-  if (response.status === 401) {
-    // Clear any stored session data
-    sessionStorage.clear();
-    localStorage.clear();
-
-    // Redirect to login page
-    window.location.href = '/login';
-    throw new APIError(401, 'Session expired. Please log in again.', 'UNAUTHORIZED');
-  }
-
+  // Just parse the response - let AuthContext/ProtectedRoute handle redirects
   return parseResponse<T>(response);
 }
 

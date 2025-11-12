@@ -128,3 +128,26 @@ export async function listQueries(
 
   return apiClient.get<QueryListResponse>(endpoint);
 }
+
+/**
+ * Example question interface
+ */
+export interface ExampleQuestion {
+  title: string;
+  description: string | null;
+}
+
+/**
+ * Example questions response
+ */
+export interface ExampleQuestionsResponse {
+  examples: ExampleQuestion[];
+}
+
+/**
+ * Get example questions from knowledge base
+ * GET /queries/examples
+ */
+export async function getExampleQuestions(): Promise<ExampleQuestionsResponse> {
+  return apiClient.get<ExampleQuestionsResponse>('/queries/examples');
+}

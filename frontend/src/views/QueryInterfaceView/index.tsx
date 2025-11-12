@@ -14,23 +14,21 @@ import SqlPreviewSection from './components/SqlPreviewSection';
 import ErrorAlert from './components/ErrorAlert';
 import ResultsSection from './components/ResultsSection';
 import Toast from '@/components/Toast';
-import { createQuery, executeQuery, getQueryResults, exportQueryCSV } from '@/services/queryService';
+import {
+  createQuery,
+  executeQuery,
+  getQueryResults,
+  exportQueryCSV,
+  getExampleQuestions,
+  type ExampleQuestion
+} from '@/services/queryService';
 import { APIError, isAPIError } from '@/types/api';
 import { getErrorMessage } from './utils/errorMessages';
 import './QueryInterfaceView.module.css';
 
-/**
- * Example questions to guide users
- */
-const EXAMPLE_QUESTIONS = [
-  "What were our top 10 customers by revenue last quarter?",
-  "Show me all orders from the last 30 days",
-  "How many active users do we have by region?",
-  "What are the best-selling products this month?",
-  "List all customers who haven't ordered in 90 days"
-];
-
 const QueryInterfaceView: React.FC = () => {
+  // Example questions from knowledge base
+  const [exampleQuestions, setExampleQuestions] = useState<string[]>([]);
   // Main state
   const [queryState, setQueryState] = useState<QueryInterfaceState>({
     naturalLanguageQuery: '',
@@ -52,6 +50,27 @@ const QueryInterfaceView: React.FC = () => {
     message: string;
     type: 'success' | 'error' | 'info';
   } | null>(null);
+
+  // Load example questions from knowledge base
+  useEffect(() => {
+    const loadExamples = async () => {
+      try {
+        const response = await getExampleQuestions();
+        const questions = response.examples.map(ex => ex.title);
+        setExampleQuestions(questions);
+      } catch (error) {
+        console.error('Failed to load example questions:', error);
+        // Use fallback examples if API fails
+        setExampleQuestions([
+          "What were our top 10 customers by revenue last quarter?",
+          "Show me all orders from the last 30 days",
+          "How many active users do we have by region?",
+        ]);
+      }
+    };
+
+    loadExamples();
+  }, []);
 
   // Restore saved input on mount
   useEffect(() => {
@@ -367,7 +386,7 @@ const QueryInterfaceView: React.FC = () => {
           onChange={handleInputChange}
           onSubmit={handleSubmit}
           disabled={queryState.isGenerating || queryState.isExecuting}
-          examples={EXAMPLE_QUESTIONS}
+          examples={exampleQuestions}
         />
 
         {/* Loading Indicator */}

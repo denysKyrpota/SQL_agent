@@ -1,111 +1,128 @@
-/* Button Component Styles */
-.btn {
+/* Button Component - Google-inspired design */
+.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1.5;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s, opacity 0.2s;
   font-family: inherit;
+  line-height: 1.5;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
 }
 
-.btn:focus-visible {
-  outline: 2px solid #3b82f6;
+.button:focus-visible {
+  outline: 2px solid #1a73e8;
   outline-offset: 2px;
 }
 
-.btn:disabled {
-  opacity: 0.5;
+/* Primary variant - Google blue */
+.button-primary {
+  background-color: #1a73e8;
+  color: white;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+.button-primary:hover:not(:disabled) {
+  background-color: #1765cc;
+  box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+}
+
+.button-primary:active:not(:disabled) {
+  background-color: #1557b0;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+/* Secondary variant - outlined */
+.button-secondary {
+  background-color: white;
+  color: #1a73e8;
+  border: 1px solid #dadce0;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background-color: #f8f9fa;
+  border-color: #dadce0;
+}
+
+.button-secondary:active:not(:disabled) {
+  background-color: #f1f3f4;
+}
+
+/* Ghost variant - minimal */
+.button-ghost {
+  background-color: transparent;
+  color: #5f6368;
+}
+
+.button-ghost:hover:not(:disabled) {
+  background-color: #f8f9fa;
+}
+
+.button-ghost:active:not(:disabled) {
+  background-color: #f1f3f4;
+}
+
+/* Disabled state */
+.button:disabled {
+  opacity: 0.38;
   cursor: not-allowed;
-}
-
-/* Sizes */
-.btn-small {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-}
-
-.btn-medium {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-}
-
-.btn-large {
-  padding: 1rem 2rem;
-  font-size: 1.125rem;
-}
-
-/* Variants */
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #2563eb;
-}
-
-.btn-secondary {
-  background-color: #e5e7eb;
-  color: #374151;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #d1d5db;
-}
-
-.btn-danger {
-  background-color: #ef4444;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background-color: #dc2626;
-}
-
-/* Modifiers */
-.btn-full-width {
-  width: 100%;
-}
-
-.btn-loading {
-  position: relative;
   pointer-events: none;
 }
 
-.btn-spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
+/* Sizes */
+.button-small {
+  padding: 0.375rem 1rem;
+  font-size: 0.813rem;
 }
 
-@keyframes spin {
+.button-large {
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+}
+
+/* Loading state */
+.button-loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.button-loading::after {
+  content: '';
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  top: 50%;
+  left: 50%;
+  margin-left: -0.5rem;
+  margin-top: -0.5rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spinner 0.6s linear infinite;
+}
+
+.button-primary.button-loading::after {
+  border-color: white;
+  border-top-color: transparent;
+}
+
+@keyframes spinner {
   to {
     transform: rotate(360deg);
   }
 }
 
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-}
-
-.btn-content {
-  display: inline-block;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
-  .btn {
-    min-height: 44px; /* Larger touch target */
-    padding: 0.875rem 1.25rem;
+  .button {
+    padding: 0.5rem 1.25rem;
   }
 }

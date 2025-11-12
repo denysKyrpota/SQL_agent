@@ -4,293 +4,388 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SQL AI Agent is a full-stack application that translates natural language queries into SQL and executes them against a PostgreSQL database. The system uses OpenAI's LLM for SQL generation with a RAG-based knowledge base for improved accuracy.
+A full-stack SQL AI Agent that translates natural language queries into SQL and executes them against a PostgreSQL database. The system uses OpenAI's LLM with a two-stage SQL generation process and RAG-based knowledge base for improved accuracy.
 
-**Stack:**
-- Backend: FastAPI + SQLAlchemy (Python 3.9+)
-- Frontend: React + TypeScript
-- Database: SQLite (app data) + PostgreSQL (target queries)
-- LLM: OpenAI GPT-4
+**Key Stats:** 179 passing tests, 89% coverage, React 18 + FastAPI + PostgreSQL + OpenAI GPT-4
 
-## Development Commands
+## Common Commands
 
-### Backend Server
+### Backend Development
 
 ```bash
-# Start development server (with auto-reload)
+# Start backend server (port 8000)
 python -m backend.app.main
-# or
+# or with uvicorn directly
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
-# API docs available at:
-# - http://localhost:8000/docs (Swagger)
-# - http://localhost:8000/redoc (ReDoc)
+# Initialize database with default users (admin/admin123, testuser/testpass123)
+python scripts/init_db.py
+# or
+make db-init
+
+# Run all tests
+pytest tests/ -v
+
+# Run tests with coverage
+pytest tests/ --cov=backend/app --cov-report=html
+
+# Run specific test file
+pytest tests/api/test_auth.py -v
+
+# Run single test
+pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v
+
+# Run tests without coverage (faster)
+python -m pytest tests/ -v --no-cov
+```
+
+### Frontend Development
+
+```bash
+cd frontend
+
+# Start dev server (port 3000, proxies /api to localhost:8000)
+npm run dev
+
+# Type check
+npm run type-check
+
+# Lint
+npm run lint
+
+# Build for production
+npm run build
 ```
 
 ### Database Management
 
 ```bash
-# Initialize database with default users (admin/admin123, testuser/testpass123)
-make db-init
-# or
-python3 scripts/init_db.py
-
-# Initialize without default users
-make db-init-clean
-
-# Reset database (WARNING: deletes all data)
-make db-reset
+# Run migrations
+make db-migrate
 
 # Check migration status
 make db-status
 
-# Run pending migrations
-make db-migrate
-
-# Preview migrations (dry run)
-make db-dry-run
+# Reset database (WARNING: deletes all data)
+make db-reset
 
 # Open SQLite shell
 make db-shell
 
-# Generate TypeScript types from database schema
+# Generate TypeScript types from schema
 make generate-types
-```
-
-### Testing
-
-```bash
-# Run Python tests
-make test
-# or
-pytest tests/ -v
-
-# Run API integration tests
-python test_api.py
-# or
-./test_api.sh
-
-# Test specific endpoint
-curl -X POST http://localhost:8000/api/queries \
-  -H "Content-Type: application/json" \
-  -d '{"natural_language_query": "Show all users"}'
-```
-
-### Cleanup
-
-```bash
-# Clean Python cache files and build artifacts
-make clean
 ```
 
 ## Architecture
 
-### Backend Structure
+### Three-Layer Backend Architecture
 
-**Three-Layer Architecture:**
-1. **API Layer** (`backend/app/api/`) - FastAPI route handlers
-2. **Service Layer** (`backend/app/services/`) - Business logic
-3. **Data Layer** (`backend/app/models/`) - SQLAlchemy ORM models
+The backend follows a strict separation of concerns:
 
-**Key Modules:**
-- `backend/app/main.py` - FastAPI app initialization, middleware, CORS config
-- `backend/app/config.py` - Pydantic settings from environment variables
-- `backend/app/database.py` - SQLAlchemy engine, session management
-- `backend/app/dependencies.py` - FastAPI dependencies (auth, db sessions)
-- `backend/app/schemas/` - Pydantic DTOs for request/response validation
-- `backend/app/models/` - SQLAlchemy models (User, Query, Session, etc.)
-- `backend/app/services/` - Business logic services:
-  - `auth_service.py` - Authentication, password hashing, JWT tokens
-  - `query_service.py` - SQL generation, validation, execution workflow
-- `backend/app/api/` - Route handlers:
-  - `auth.py` - Login/logout endpoints
-  - `queries.py` - Query submission, execution, history
+1. **API Layer** (`backend/app/api/`)
+   - FastAPI route handlers
+   - Request/response validation via Pydantic schemas
+   - Authentication and authorization enforcement
+   - Minimal business logic - delegates to services
 
-### Frontend Structure
+2. **Service Layer** (`backend/app/services/`)
+   - All business logic lives here
+   - Orchestrates complex workflows
+   - Handles external API calls (OpenAI)
+   - Transaction management
 
-**Component-Based React Application:**
-- `frontend/src/views/` - Page-level components (QueryInterfaceView)
-- `frontend/src/components/` - Reusable UI components (Button, TextArea, Pagination, Toast, ErrorBoundary)
-- `frontend/src/services/` - API client layer:
-  - `apiClient.ts` - Base axios configuration with auth interceptors
-  - `queryService.ts` - Query-related API calls
-- `frontend/src/hooks/` - Custom React hooks
-- `frontend/src/types/` - TypeScript type definitions:
-  - `database.types.ts` - Auto-generated from database schema
-  - `common.ts`, `models.ts`, `api.ts` - Application types
-  - `utils.ts` - Type guards and utilities
+3. **Data Layer** (`backend/app/models/`)
+   - SQLAlchemy ORM models
+   - Database schema definitions
+   - Relationships and constraints
+
+**Critical:** Never put business logic in API handlers. Always delegate to service layer.
+
+### Two-Stage SQL Generation Process
+
+The core SQL generation workflow is implemented in `backend/app/services/query_service.py` and `backend/app/services/llm_service.py`:
+
+**Stage 1: Schema Optimization** (`LLMService.select_relevant_tables()`)
+- Problem: PostgreSQL schema has 279 tables - too large for LLM context
+- Solution: Use LLM to select only relevant tables (max 10) based on question
+- Input: All table names + user question
+- Output: List of 5-10 relevant table names
+- Implementation: `backend/app/services/llm_service.py:39-106`
+
+**Stage 2: SQL Generation** (`LLMService.generate_sql()`)
+- Use filtered schema from Stage 1
+- Load similar SQL examples from knowledge base (top 3)
+- Generate SQL with full context (schema + examples)
+- Validate SQL (SELECT-only, no DDL/DML)
+- Implementation: `backend/app/services/llm_service.py:151-214`
+
+**Complete Workflow:**
+```
+User submits question
+  → QueryService.create_query_attempt()
+  → SchemaService.get_table_names()
+  → LLMService.select_relevant_tables() [Stage 1]
+  → SchemaService.filter_schema_by_tables()
+  → KnowledgeBaseService.find_similar_examples()
+  → LLMService.generate_sql() [Stage 2]
+  → Validate SQL
+  → Store in database
+  → Return to user
+```
+
+### Query Execution Flow
+
+Implemented in `backend/app/services/postgres_execution_service.py`:
+
+```
+User requests execution
+  → PostgresExecutionService.execute_query()
+  → Validate query (must be generated, not executed, SELECT-only)
+  → Execute with 30-second timeout
+  → Store results in QueryResultsManifest (JSON)
+  → Paginate results (500 rows per page)
+  → Return first page
+```
+
+**Important:** Results are stored in `QueryResultsManifest` model as JSON, not in separate tables. This allows efficient pagination without re-querying PostgreSQL.
 
 ### Database Architecture
 
-**SQLite Application Database** (`sqlite.db`):
-- `users` - User accounts with bcrypt password hashes, role-based access (admin/user)
-- `sessions` - Session tracking for authentication with expiration
-- `query_attempts` - History of natural language queries and generated SQL
-- `query_results_manifest` - Metadata for query results (pagination, export)
-- `schema_snapshots` - Cached PostgreSQL schema for LLM context
-- `kb_examples_index` - Index of knowledge base SQL example files
-- `metrics_rollup` - Weekly aggregated metrics
+**Two Databases:**
+1. **SQLite** (`sqlite.db`) - Application data
+   - Users, sessions (JWT auth)
+   - Query attempts and results
+   - Managed via migrations in `migrations/`
 
-**Migration System:**
-- SQL migrations in `migrations/*.sql` (timestamped)
-- Migration runner: `python3 backend/app/migrations_runner.py`
-- Managed via Makefile targets (`make db-migrate`, `make db-status`)
+2. **PostgreSQL** (configured via `POSTGRES_URL`) - Target database
+   - User's data to query
+   - Read-only SELECT queries
+   - Schema cached in `data/schema/` JSON files
 
 ### Authentication Flow
 
-1. User submits credentials to `POST /api/auth/login`
-2. `AuthService` validates credentials and creates session
-3. JWT token returned to client (stored in memory/localStorage)
-4. Client includes token in `Authorization: Bearer <token>` header
-5. `get_current_user` dependency validates token on protected routes
-6. Role-based access: admins see all data, users see only their own queries
+Implemented in `backend/app/services/auth_service.py`:
 
-### Query Workflow
+1. Login: POST `/api/auth/login` with username/password
+2. Verify password with bcrypt
+3. Create Session record with JWT token
+4. Return token + user info
+5. Frontend stores token and adds to Authorization header
+6. `get_current_user` dependency validates token on protected routes
+7. Logout: POST `/api/auth/logout` revokes session
 
-1. User submits natural language query via `POST /api/queries`
-2. `QueryService` retrieves schema snapshot and knowledge base examples
-3. OpenAI LLM generates SQL with RAG context
-4. SQL validated (SELECT-only, no DDL/DML)
-5. Query executed against PostgreSQL target database
-6. Results paginated and stored in manifest
-7. User can download results as CSV via export endpoint
+**Session Management:**
+- JWT tokens stored in Session table
+- Configurable expiration (default 8 hours)
+- Token revocation on logout
+- Role-based access: admin sees all queries, users see only their own
 
-### Type Synchronization
+### Knowledge Base System
 
-**Backend → Frontend:**
-1. Database schema defined in SQLAlchemy models
-2. `scripts/generate_types.py` reads schema
-3. TypeScript types generated in `frontend/src/types/database.types.ts`
-4. Run `make generate-types` after schema changes
+Located in `data/knowledge_base/*.sql`:
 
-**Pydantic DTOs Mirror TypeScript Types:**
-- `backend/app/schemas/` defines request/response DTOs
-- `frontend/src/types/api.ts` defines matching TypeScript interfaces
-- Keep these in sync manually when adding new endpoints
+- SQL examples for RAG-based generation
+- Used in Stage 2 to provide context
+- Currently: Simple keyword matching (TODO: embeddings)
+- Service: `backend/app/services/knowledge_base_service.py`
+
+When adding new example queries:
+1. Create `.sql` file in `data/knowledge_base/`
+2. Use descriptive filename (becomes query description)
+3. Write clean, well-formatted SQL
+4. Restart backend to reload examples
+
+## Frontend Architecture
+
+### Component Structure
+
+- **Views** (`frontend/src/views/`) - Page-level components with routing
+  - `QueryInterfaceView/` - Main SQL generation and execution interface
+  - `QueryHistoryView/` - Historical query list with filtering
+  - `LoginView/` - Authentication
+
+- **Components** (`frontend/src/components/`) - Reusable UI components
+  - Button, TextArea, Toast, Pagination, etc.
+  - Each component in own directory with index.tsx
+
+- **Services** (`frontend/src/services/`) - API client layer
+  - `apiClient.ts` - Axios instance with auth interceptors
+  - `authService.ts`, `queryService.ts`, `adminService.ts`
+  - All API calls go through services, never direct fetch/axios in components
+
+- **Types** (`frontend/src/types/`) - TypeScript definitions
+  - Generated from backend schemas via `make generate-types`
+  - Keep in sync with backend Pydantic models
+
+### API Integration
+
+All API communication uses the centralized `apiClient` (Axios instance):
+
+```typescript
+// frontend/src/services/apiClient.ts exports configured axios
+// - Automatically adds Authorization header from AuthContext
+// - Handles 401 errors (redirects to login)
+// - Base URL: http://localhost:8000 or /api (proxied)
+```
+
+**Pattern:**
+1. AuthContext provides authentication state
+2. ProtectedRoute wraps authenticated views
+3. Services use apiClient for all API calls
+4. apiClient interceptor adds auth token
+5. On 401, clear auth and redirect to login
+
+## Testing
+
+### Test Organization
+
+```
+tests/
+├── api/              # API endpoint tests (FastAPI TestClient)
+│   ├── test_auth.py  # Login, logout, session validation
+│   └── test_queries.py  # Query CRUD, execution, export
+└── services/         # Service layer unit tests
+    ├── test_query_service.py
+    ├── test_llm_service.py
+    ├── test_knowledge_base_service.py
+    └── ...
+```
+
+### Testing Patterns
+
+**Use fixtures from `conftest.py`:**
+- `db_session` - Clean database for each test
+- `test_user` - Pre-created test user
+- `admin_user` - Pre-created admin user
+- `auth_headers_user` - Authorization headers for test user
+- `mock_llm_service` - Mocked LLM for fast tests
+
+**API Testing:**
+```python
+from fastapi.testclient import TestClient
+from backend.app.main import app
+
+client = TestClient(app)
+response = client.post("/api/auth/login", json={"username": "...", "password": "..."})
+assert response.status_code == 200
+```
+
+**Service Testing:**
+```python
+@pytest.mark.asyncio
+async def test_generate_sql(mock_llm_service):
+    result = await mock_llm_service.generate_sql(...)
+    assert result.startswith("SELECT")
+```
+
+### Key Test Coverage Areas
+
+- Authentication flow (login, logout, token validation)
+- Two-stage SQL generation (table selection + SQL generation)
+- Query execution with timeout and validation
+- CSV export with row limits (10,000 max)
+- Knowledge base loading and example retrieval
+- Role-based access control (admin vs user)
 
 ## Environment Configuration
 
 Copy `.env.example` to `.env` and configure:
 
-```bash
-# SQLite for app data
-DATABASE_URL=sqlite:///./sqlite.db
+**Required:**
+- `OPENAI_API_KEY` - Get from https://platform.openai.com/api-keys
+- `POSTGRES_URL` - Target database for queries (postgresql://...)
 
-# PostgreSQL for query execution (target database)
-POSTGRES_URL=postgresql://user:pass@host:port/db
+**Optional but Important:**
+- `SECRET_KEY` - Change in production (use `openssl rand -hex 32`)
+- `SESSION_EXPIRATION_HOURS` - Default 8 hours
+- `OPENAI_MODEL` - Default gpt-4 (can use gpt-3.5-turbo for cost)
+- `DATABASE_ECHO` - Set `true` to log all SQL queries
 
-# OpenAI API key (required for SQL generation)
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4
+## Code Style and Patterns
 
-# JWT secret (change in production!)
-SECRET_KEY=change-this-secret-key-in-production
+### Backend (Python)
 
-# Session expiration
-SESSION_EXPIRATION_HOURS=8
-```
+- Use type hints everywhere
+- Async/await for I/O operations (OpenAI, database)
+- Pydantic for all DTOs and validation
+- Dependency injection via FastAPI dependencies
+- Comprehensive logging with structured extra fields
+- Exception handling: Raise HTTPException in API layer, custom exceptions in services
 
-## Key Design Patterns
+### Frontend (TypeScript)
 
-### Dependency Injection
+- Functional components with hooks
+- CSS Modules for styling (`.module.css`)
+- No inline styles except for dynamic values
+- Props interfaces defined in component file or separate `types.ts`
+- Custom hooks in `hooks/` directory
+- Error boundaries for graceful failure
 
-FastAPI dependencies used for:
-- Database sessions: `db: Session = Depends(get_db)`
-- Current user: `user: User = Depends(get_current_user)`
-- Settings: `settings: Settings = Depends(get_settings)`
+## Common Workflows
 
-### Service Layer Pattern
+### Adding a New API Endpoint
 
-Business logic isolated in service classes:
-- API routes are thin, delegate to services
-- Services handle complex logic, transactions, external APIs
-- Services are stateless, receive dependencies as parameters
-
-### Schema Validation
-
-All API endpoints use Pydantic schemas:
-- Request validation with field constraints
-- Response serialization with `from_attributes=True` for ORM models
-- Custom validators for business rules
-
-### Error Handling
-
-- Pydantic validation errors → 422 Unprocessable Entity
-- ValueError exceptions → 400 Bad Request (custom handler)
-- Authentication failures → 401 Unauthorized
-- Authorization failures → 403 Forbidden
-- Service errors logged with context
-
-### Security
-
-- Passwords hashed with bcrypt (never stored plaintext)
-- JWT tokens for stateless authentication
-- SQL injection prevention: parameterized queries only, SELECT-only validation
-- CORS configured for localhost:3000 and localhost:5173
-- Security headers added via middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection)
-
-## Common Development Tasks
-
-### Adding a New Endpoint
-
-1. Define Pydantic request/response schemas in `backend/app/schemas/`
-2. Add route handler in `backend/app/api/`
-3. Implement business logic in `backend/app/services/`
+1. Define Pydantic schemas in `backend/app/schemas/`
+2. Implement business logic in `backend/app/services/`
+3. Create route handler in `backend/app/api/`
 4. Register router in `backend/app/main.py`
-5. Add matching TypeScript types in `frontend/src/types/api.ts`
-6. Create API service function in `frontend/src/services/`
-7. Test with `curl` or `test_api.py`
+5. Write tests in `tests/api/`
+6. Update frontend types: `make generate-types`
+7. Create service function in `frontend/src/services/`
+8. Use in component
 
-### Adding a Database Table
+### Adding a Database Migration
 
-1. Create SQLAlchemy model in `backend/app/models/`
-2. Create SQL migration in `migrations/YYYYMMDDHHMMSS_description.sql`
-3. Run `make db-migrate` to apply migration
-4. Run `make generate-types` to update TypeScript types
-5. Add corresponding Pydantic schema in `backend/app/schemas/`
-6. Update service layer to interact with new model
+1. Create migration file: `touch migrations/YYYYMMDDHHMMSS_description.sql`
+2. Write SQL (CREATE TABLE, ALTER TABLE, etc.)
+3. Run migration: `make db-migrate`
+4. Update SQLAlchemy models in `backend/app/models/`
+5. Generate TypeScript types: `make generate-types`
 
-### Working with Migrations
+### Debugging SQL Generation Issues
 
-- Migrations are SQL files, not auto-generated
-- Naming: `YYYYMMDDHHMMSS_description.sql`
-- Each migration tracked in `migration_history` table
-- Use `make db-status` to see which migrations are applied
-- Use `make db-dry-run` to preview pending migrations
-- Never edit applied migrations; create new ones instead
+1. Check OpenAI API key is valid
+2. Enable SQL logging: `DATABASE_ECHO=true` in `.env`
+3. Look at LLM prompts in logs (INFO level)
+4. Check knowledge base examples loaded correctly
+5. Verify schema snapshot is up to date
+6. Test with simpler questions first
+7. Check token usage in logs (may hit limits)
 
-### Debugging
+## Important Constraints
 
-**Backend:**
-- Set `DATABASE_ECHO=true` in `.env` to see SQL queries
-- Check logs in console (configured in `main.py`)
-- Use FastAPI docs at `/docs` for interactive testing
+- **SQL Safety:** Only SELECT queries allowed - validated in multiple places
+- **Export Limits:** CSV export capped at 10,000 rows
+- **Timeout:** PostgreSQL queries timeout after 30 seconds
+- **Pagination:** Results paginated at 500 rows per page
+- **Table Selection:** Max 10 tables selected in Stage 1
+- **KB Examples:** Top 3 examples used in Stage 2
 
-**Frontend:**
-- API calls logged via axios interceptors
-- Use browser DevTools Network tab
-- Toast notifications show user-facing errors
+## API Documentation
 
-## Project Status
+When backend is running:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
-The project is in active development with core functionality implemented:
+## Troubleshooting
 
-**Completed:**
-- ✅ Database schema and migrations system
-- ✅ SQLAlchemy ORM models
-- ✅ Authentication with JWT tokens
-- ✅ Pydantic DTOs and TypeScript types
-- ✅ FastAPI app with CORS and middleware
-- ✅ Query submission API endpoint
-- ✅ Frontend Query Interface View with form and results display
-- ✅ API integration layer with axios client
+**"OpenAI API key not configured"**
+- Add `OPENAI_API_KEY=sk-...` to `.env`
 
-**In Progress / TODO:**
-- LLM integration with OpenAI (service stub exists)
-- Knowledge base loading and RAG implementation
-- PostgreSQL query execution
-- CSV export functionality
-- Admin endpoints for schema refresh
-- Query history view in frontend
+**"LLM did not return valid table names"**
+- Stage 1 failed - LLM response format unexpected
+- Check logs for raw LLM response
+- Simplify question or add more context
 
-See git commit history and `.ai/*.md` files for detailed implementation plans.
+**"Query execution failed: timeout"**
+- Query took >30 seconds
+- Optimize query or increase `POSTGRES_TIMEOUT`
+
+**Frontend can't reach API**
+- Verify backend running on port 8000
+- Check CORS settings in `backend/app/main.py`
+- Verify proxy config in `frontend/vite.config.ts`
+
+**Tests failing with database errors**
+- Run `make db-init` to reset test database
+- Check migrations are up to date: `make db-status`

@@ -243,3 +243,44 @@ class RerunQueryResponse(QueryAttemptResponse):
                 "error_message": None,
             }
         }
+
+
+class ExampleQuestion(BaseModel):
+    """Example question from knowledge base."""
+
+    title: str = Field(description="Human-readable title for the example")
+    description: str | None = Field(
+        default=None, description="Optional description of what the query does"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "Drivers With Current Availability",
+                "description": "Show all drivers and their current availability status",
+            }
+        }
+
+
+class ExampleQuestionsResponse(BaseModel):
+    """Response containing example questions from knowledge base."""
+
+    examples: list[ExampleQuestion] = Field(
+        description="List of example questions from knowledge base"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "examples": [
+                    {
+                        "title": "Drivers With Current Availability",
+                        "description": "Show all drivers and their current availability status",
+                    },
+                    {
+                        "title": "Current Year Delayed Activities",
+                        "description": "Find activities delayed by more than 3 hours this year",
+                    },
+                ]
+            }
+        }

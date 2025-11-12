@@ -1,38 +1,73 @@
-/* QueryInterfaceView Main Styles */
+/* QueryInterfaceView - Hero-style layout with Google aesthetic */
 .query-interface {
-  min-height: 100vh;
-  padding: 2rem;
-  background-color: #f9fafb;
+  min-height: calc(100vh - 60px);
+  background-color: #ffffff;
 }
 
 .query-interface-container {
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 2rem;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  padding: 0;
 }
 
+/* Hero Section - centered input at top */
 .query-interface-container h1 {
-  margin-top: 0;
-  margin-bottom: 2rem;
-  font-size: 2rem;
-  font-weight: 700;
-  color: #111827;
+  margin: 0;
+  padding: 6rem 0 3rem 0;
+  font-size: 3rem;
+  font-weight: 400;
+  color: #202124;
+  text-align: center;
+  letter-spacing: -0.5px;
+}
+
+/* Form container - 60% width, centered */
+.query-form {
+  max-width: 60%;
+  margin: 0 auto 4rem auto;
+}
+
+/* Content below form - full width with padding */
+.query-interface-container > *:not(.query-form):not(h1) {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
+}
+
+/* Spacing between sections */
+.query-interface-container > * + * {
+  margin-top: 2rem;
 }
 
 /* Responsive adjustments */
+@media (max-width: 1200px) {
+  .query-form {
+    max-width: 70%;
+  }
+}
+
 @media (max-width: 768px) {
-  .query-interface {
-    padding: 1rem;
-  }
-
-  .query-interface-container {
-    padding: 1rem;
-  }
-
   .query-interface-container h1 {
-    font-size: 1.5rem;
+    padding: 3rem 1rem 2rem 1rem;
+    font-size: 2rem;
+  }
+
+  .query-form {
+    max-width: 90%;
+  }
+
+  .query-interface-container > *:not(.query-form):not(h1) {
+    padding: 0 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .query-interface-container h1 {
+    font-size: 1.75rem;
+  }
+
+  .query-form {
+    max-width: 95%;
   }
 }

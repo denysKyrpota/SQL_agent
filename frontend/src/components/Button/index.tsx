@@ -27,11 +27,11 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const classNames = [
-    'btn',
-    `btn-${variant}`,
-    `btn-${size}`,
-    fullWidth ? 'btn-full-width' : '',
-    loading ? 'btn-loading' : '',
+    'button',
+    `button-${variant}`,
+    `button-${size}`,
+    fullWidth ? 'button-full-width' : '',
+    loading ? 'button-loading' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -43,13 +43,11 @@ const Button: React.FC<ButtonProps> = ({
       aria-label={ariaLabel}
       aria-busy={loading}
     >
-      {loading && (
-        <span className="btn-spinner" aria-hidden="true"></span>
-      )}
       {!loading && icon && (
-        <span className="btn-icon" aria-hidden="true">{icon}</span>
+        <span className="button-icon" aria-hidden="true">{icon}</span>
       )}
-      <span className="btn-content">{children}</span>
+      {!loading && <span className="button-content">{children}</span>}
+      {loading && <span className="button-content" style={{ visibility: 'hidden' }}>{children}</span>}
     </button>
   );
 };

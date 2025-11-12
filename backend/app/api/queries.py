@@ -53,10 +53,89 @@ query_service = QueryService()
 postgres_service = PostgresExecutionService()
 export_service = ExportService()
 
+# Initialize knowledge base service for examples
+from backend.app.services.knowledge_base_service import KnowledgeBaseService
+kb_service = KnowledgeBaseService()
+
 
 # ============================================================================
 # Route Handlers
 # ============================================================================
+
+
+@router.get(
+    "/examples",
+    response_model=dict,
+    summary="Get example questions from knowledge base",
+    responses={
+        200: {
+            "description": "Example questions retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "examples": [
+                            {
+                                "title": "Drivers With Current Availability",
+                                "description": "Show all drivers and their current availability status",
+                            },
+                            {
+                                "title": "Current Year Delayed Activities",
+                                "description": "Find activities delayed by more than 3 hours this year",
+                            },
+                        ]
+                    }
+                }
+            },
+        },
+    },
+)
+async def get_example_questions(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Get example questions from knowledge base.
+
+    Retrieves example SQL questions based on the knowledge base .sql files.
+    Each example includes a title derived from the filename and an optional description.
+
+    Returns:
+        ExampleQuestionsResponse: List of example questions
+    """
+    logger.info(
+        f"User {current_user.id} requesting example questions",
+        extra={"user_id": current_user.id}
+    )
+
+    try:
+        # Get all examples from knowledge base
+        examples = kb_service.get_examples()
+
+        # Convert to response format
+        example_questions = [
+            {
+                "title": example.title,
+                "description": example.description,
+            }
+            for example in examples
+        ]
+
+        logger.info(
+            f"Returning {len(example_questions)} example questions",
+            extra={"count": len(example_questions)}
+        )
+
+        return {"examples": example_questions}
+
+    except Exception as e:
+        logger.error(
+            f"Failed to load example questions: {e}",
+            extra={"error": str(e)},
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load example questions"
+        )
 
 
 @router.post(
