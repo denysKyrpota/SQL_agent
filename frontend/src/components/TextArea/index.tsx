@@ -7,7 +7,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { TextAreaProps } from '@/views/QueryInterfaceView/types';
-import './TextArea.module.css';
+import styles from './TextArea.module.css';
 
 const TextArea: React.FC<TextAreaProps> = ({
   value,
@@ -44,15 +44,15 @@ const TextArea: React.FC<TextAreaProps> = ({
   const isAtLimit = currentLength >= maxLength;
 
   const textareaClasses = [
-    'textarea',
-    isNearLimit ? 'textarea-warning' : '',
-    isAtLimit ? 'textarea-error' : '',
-    disabled ? 'textarea-disabled' : '',
+    styles.textarea,
+    isNearLimit ? styles['textarea-warning'] : '',
+    isAtLimit ? styles['textarea-error'] : '',
+    disabled ? styles['textarea-disabled'] : '',
   ].filter(Boolean).join(' ');
 
   return (
-    <div className="textarea-wrapper">
-      <label htmlFor={id} className="textarea-label">
+    <div className={styles['textarea-wrapper']}>
+      <label htmlFor={id} className={styles['textarea-label']}>
         {label}
       </label>
       <textarea

@@ -13,7 +13,7 @@
 /* Hero Section - centered input at top */
 .query-interface-container h1 {
   margin: 0;
-  padding: 6rem 0 3rem 0;
+  padding: 5rem 0 2.5rem 0;
   font-size: 3rem;
   font-weight: 400;
   color: #202124;
@@ -21,9 +21,9 @@
   letter-spacing: -0.5px;
 }
 
-/* Form container - 60% width, centered */
+/* Form container - 70% width, centered */
 .query-form {
-  max-width: 60%;
+  max-width: 70%;
   margin: 0 auto 4rem auto;
 }
 
@@ -43,18 +43,18 @@
 /* Responsive adjustments */
 @media (max-width: 1200px) {
   .query-form {
-    max-width: 70%;
+    max-width: 75%;
   }
 }
 
 @media (max-width: 768px) {
   .query-interface-container h1 {
-    padding: 3rem 1rem 2rem 1rem;
+    padding: 3rem 1rem 1.5rem 1rem;
     font-size: 2rem;
   }
 
   .query-form {
-    max-width: 90%;
+    max-width: 88%;
   }
 
   .query-interface-container > *:not(.query-form):not(h1) {
@@ -64,10 +64,11 @@
 
 @media (max-width: 480px) {
   .query-interface-container h1 {
+    padding: 2rem 1rem 1.25rem 1rem;
     font-size: 1.75rem;
   }
 
   .query-form {
-    max-width: 95%;
+    max-width: 92%;
   }
 }

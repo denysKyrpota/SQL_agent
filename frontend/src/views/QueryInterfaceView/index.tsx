@@ -24,7 +24,7 @@ import {
 } from '@/services/queryService';
 import { APIError, isAPIError } from '@/types/api';
 import { getErrorMessage } from './utils/errorMessages';
-import './QueryInterfaceView.module.css';
+import styles from './QueryInterfaceView.module.css';
 
 const QueryInterfaceView: React.FC = () => {
   // Example questions from knowledge base
@@ -367,7 +367,7 @@ const QueryInterfaceView: React.FC = () => {
   };
 
   return (
-    <main className="query-interface" aria-label="Query Interface">
+    <main className={styles['query-interface']} aria-label="Query Interface">
       {/* Toast Notifications */}
       {toast && (
         <Toast
@@ -377,17 +377,19 @@ const QueryInterfaceView: React.FC = () => {
         />
       )}
 
-      <div className="query-interface-container">
+      <div className={styles['query-interface-container']}>
         <h1>Ask Your Database</h1>
 
         {/* Query Form Section */}
-        <QueryForm
-          value={queryState.naturalLanguageQuery}
-          onChange={handleInputChange}
-          onSubmit={handleSubmit}
-          disabled={queryState.isGenerating || queryState.isExecuting}
-          examples={exampleQuestions}
-        />
+        <div className={styles['query-form']}>
+          <QueryForm
+            value={queryState.naturalLanguageQuery}
+            onChange={handleInputChange}
+            onSubmit={handleSubmit}
+            disabled={queryState.isGenerating || queryState.isExecuting}
+            examples={exampleQuestions}
+          />
+        </div>
 
         {/* Loading Indicator */}
         {queryState.loadingStage && (

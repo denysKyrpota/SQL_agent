@@ -12,7 +12,7 @@ import Button from '@/components/Button';
 import CharacterCount from './CharacterCount';
 import ExampleQuestions from './ExampleQuestions';
 import { validateQuery } from '../../utils/validation';
-import './QueryForm.module.css';
+import styles from './QueryForm.module.css';
 
 const MAX_QUERY_LENGTH = 5000;
 
@@ -55,31 +55,34 @@ const QueryForm: React.FC<QueryFormProps> = ({
   const isSubmitDisabled = disabled || value.trim().length === 0;
 
   return (
-    <form className="query-form" onSubmit={handleSubmit}>
-      <div className="form-group">
-        <div className="form-header">
-          <label htmlFor="query-input" className="form-label">
-            Enter your database question
-          </label>
-          <CharacterCount
-            current={value.length}
-            max={MAX_QUERY_LENGTH}
-          />
-        </div>
+    <form className={styles['query-form']} onSubmit={handleSubmit}>
+      <div className={styles['form-group']}>
+        {/* Only show header when user has typed something */}
+        {value.length > 0 && (
+          <div className={styles['form-header']}>
+            <label htmlFor="query-input" className={styles['form-label']}>
+              Your question
+            </label>
+            <CharacterCount
+              current={value.length}
+              max={MAX_QUERY_LENGTH}
+            />
+          </div>
+        )}
 
         <TextArea
           id="query-input"
           value={value}
           onChange={handleChange}
           maxLength={MAX_QUERY_LENGTH}
-          placeholder="e.g., What were our top 10 customers by revenue last quarter?"
+          placeholder="Ask your database a question..."
           disabled={disabled}
           autoFocus={true}
           label=""
         />
 
         {validationError && (
-          <div className="form-error" role="alert">
+          <div className={styles['form-error']} role="alert">
             {validationError}
           </div>
         )}
@@ -91,7 +94,7 @@ const QueryForm: React.FC<QueryFormProps> = ({
         disabled={disabled}
       />
 
-      <div className="form-actions">
+      <div className={styles['form-actions']}>
         <Button
           type="submit"
           variant="primary"
