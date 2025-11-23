@@ -190,7 +190,7 @@ GROUP BY u.id, u.username;
 
         response = "I cannot generate a query for that question."
 
-        with pytest.raises(ValueError, match="not a SELECT statement"):
+        with pytest.raises(ValueError, match="SELECT statement or use WITH for CTEs"):
             service._extract_sql_from_response(response)
 
 
@@ -299,7 +299,7 @@ class TestGenerateSQL:
             return_value="I cannot help with that."
         )
 
-        with pytest.raises(ValueError, match="not a SELECT statement"):
+        with pytest.raises(ValueError, match="SELECT statement or use WITH for CTEs"):
             await service.generate_sql(
                 question="Show users",
                 schema_text="Table: users",

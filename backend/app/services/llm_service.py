@@ -186,15 +186,63 @@ Your response:"""
 
         logger.info("Stage 2: Generating SQL query")
 
+        # Log a warning if the question contains potentially confusing keywords
+        question_upper = question.upper()
+        confusing_keywords = ["DELETE", "INSERT", "UPDATE", "CREATE", "DROP", "ALTER", "TRUNCATE"]
+        found_keywords = [kw for kw in confusing_keywords if kw in question_upper]
+        if found_keywords:
+            logger.warning(
+                f"Question contains potentially confusing keywords: {found_keywords}. "
+                f"These will be interpreted as column names/filters, not SQL commands."
+            )
+
         # Build prompt for SQL generation
         prompt = self._build_sql_generation_prompt(question, schema_text, examples)
 
-        # Call OpenAI with retry logic
+        # Call OpenAI with retry logic using few-shot examples to reinforce SELECT-only behavior
         response_text = await self._call_openai_with_retry(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert PostgreSQL developer. Generate correct, efficient SQL queries based on the provided schema and examples."
+                    "content": (
+                        "You are an expert PostgreSQL developer who generates ONLY read-only SELECT queries. "
+                        "ABSOLUTE RULE: Your response MUST start with 'SELECT' or 'WITH' (for CTEs). "
+                        "FORBIDDEN WORDS IN YOUR RESPONSE: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, TRUNCATE. "
+                        "These commands are COMPLETELY PROHIBITED - do not use them anywhere in your SQL. "
+                        "\n\n"
+                        "CRITICAL: When you see words like 'deleted', 'created', 'updated' in questions, these refer to:\n"
+                        "- 'deleted' = a boolean column (deleted = true/false) or a timestamp (deleted_at)\n"
+                        "- 'created' = a timestamp column (created_at) showing when records were created\n"
+                        "- 'updated' = a timestamp column (updated_at) showing when records were updated\n"
+                        "- 'deactivated' = a timestamp column (deactivated_at) or status field\n"
+                        "\n"
+                        "You are working with a READ-ONLY database. You can ONLY retrieve data, never modify it. "
+                        "Every query must be a SELECT statement that reads existing data."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": "Show me all created customers"
+                },
+                {
+                    "role": "assistant",
+                    "content": "SELECT * FROM customers WHERE created_at IS NOT NULL;"
+                },
+                {
+                    "role": "user",
+                    "content": "Get deleted records from activities"
+                },
+                {
+                    "role": "assistant",
+                    "content": "SELECT * FROM activities WHERE deleted = true;"
+                },
+                {
+                    "role": "user",
+                    "content": "Deactivated created customers this month"
+                },
+                {
+                    "role": "assistant",
+                    "content": "SELECT * FROM customers WHERE deactivated_at IS NOT NULL AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE);"
                 },
                 {
                     "role": "user",
@@ -244,7 +292,7 @@ SIMILAR EXAMPLES FROM KNOWLEDGE BASE:
         else:
             examples_section = ""
 
-        prompt = f"""You are generating a PostgreSQL SELECT query to answer a user's question.
+        prompt = f"""⚠️ MANDATORY INSTRUCTION: Generate ONLY a SELECT query. Do NOT use DELETE, INSERT, UPDATE, CREATE, DROP, ALTER, or TRUNCATE.
 
 DATABASE SCHEMA:
 {schema_text}
@@ -252,17 +300,39 @@ DATABASE SCHEMA:
 USER QUESTION:
 "{question}"
 
-REQUIREMENTS:
-1. Generate a valid PostgreSQL SELECT query
-2. Use only tables and columns from the schema above
-3. Follow best practices (proper JOINs, WHERE clauses, etc.)
-4. Use descriptive column aliases where helpful
-5. Return ONLY the SQL query, no explanations
-6. Do NOT use INSERT, UPDATE, DELETE, DROP, or other modification commands
-7. Format the query for readability (line breaks and indentation)
+⚠️ CRITICAL: Words like "deleted", "created", "updated", "deactivated" in questions refer to COLUMN NAMES, NOT SQL commands!
+
+CORRECT INTERPRETATIONS (follow these patterns):
+❌ WRONG: "show deleted records" → DELETE FROM records...
+✅ CORRECT: "show deleted records" → SELECT * FROM records WHERE deleted = true;
+
+❌ WRONG: "created customers" → CREATE TABLE customers...
+✅ CORRECT: "created customers" → SELECT * FROM customers WHERE created_at IS NOT NULL;
+
+❌ WRONG: "deactivated users" → DROP TABLE users...
+✅ CORRECT: "deactivated users" → SELECT * FROM users WHERE deactivated_at IS NOT NULL;
+
+❌ WRONG: "updated orders" → UPDATE orders...
+✅ CORRECT: "updated orders" → SELECT * FROM orders WHERE updated_at IS NOT NULL;
+
+CRITICAL REQUIREMENTS - READ CAREFULLY:
+1. Generate ONLY a SELECT query - this is mandatory and non-negotiable
+2. NEVER generate CREATE, INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any other data modification commands
+3. Even if the question mentions words like "create", "add", "insert", "update", or "delete", you must interpret this as a request to QUERY existing data, not modify it
+4. Use only tables and columns from the schema above
+5. Follow best practices (proper JOINs, WHERE clauses, etc.)
+6. Use descriptive column aliases where helpful
+7. Return ONLY the SQL query, no explanations
+8. Format the query for readability (line breaks and indentation)
+
+IMPORTANT CLARIFICATIONS:
+- "Show created customers" means SELECT customers WHERE created_at...
+- "Get deleted activities" means SELECT activities WHERE deleted = true...
+- "Find updated records" means SELECT records WHERE updated_at...
+- You are ONLY querying a read-only database - you cannot modify anything
 
 RESPONSE FORMAT:
-Return ONLY the SQL query, starting with SELECT and ending with semicolon.
+Return ONLY the SQL query, starting with SELECT (or WITH for CTEs) and ending with semicolon.
 Do not include markdown code blocks (```sql) or any explanation.
 
 Your SQL query:"""
@@ -475,21 +545,37 @@ Your SQL query:"""
         if not cleaned.endswith(";"):
             cleaned += ";"
 
-        # Basic validation
-        if not cleaned.upper().startswith("SELECT"):
-            logger.error(f"Response doesn't start with SELECT: {cleaned[:100]}")
+        # Basic validation - allow SELECT and WITH (for CTEs)
+        cleaned_upper = cleaned.upper()
+        if not (cleaned_upper.startswith("SELECT") or cleaned_upper.startswith("WITH")):
+            logger.error(f"Response doesn't start with SELECT or WITH: {cleaned[:100]}")
             raise ValueError(
-                "Generated query is not a SELECT statement. Please try again."
+                "Generated query must be a SELECT statement or use WITH for CTEs. "
+                "This system only supports read-only queries. Please rephrase your question to query existing data."
             )
 
-        # Check for dangerous commands
+        # Check for dangerous commands - use word boundary matching to avoid false positives
+        # with column names like "created_at" or table names containing these words
+        import re
         dangerous_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]
-        cleaned_upper = cleaned.upper()
         for keyword in dangerous_keywords:
-            if keyword in cleaned_upper:
-                logger.error(f"Response contains dangerous keyword '{keyword}'")
+            # Match as a standalone word (not part of column/table names)
+            # Pattern: keyword followed by whitespace or common SQL tokens
+            pattern = rf'\b{keyword}\s+(TABLE|INTO|FROM|SET|DATABASE|SCHEMA|INDEX|VIEW|TRIGGER|FUNCTION|PROCEDURE|\()'
+            if re.search(pattern, cleaned_upper):
+                logger.error(f"Response contains dangerous keyword '{keyword}' in DDL/DML context")
                 raise ValueError(
-                    f"Generated query contains forbidden operation: {keyword}"
+                    f"The AI attempted to generate a {keyword} operation, which is not allowed. "
+                    f"This system only supports SELECT queries to read data, not modify it. "
+                    f"Please rephrase your question to ask about existing data (e.g., 'Show me customers that were created...' instead of 'Create customers...')."
+                )
+            # Also check for the keyword at the start of a statement
+            elif cleaned_upper.strip().startswith(keyword + " ") or cleaned_upper.strip().startswith(keyword + "\n"):
+                logger.error(f"Response starts with dangerous keyword '{keyword}'")
+                raise ValueError(
+                    f"The AI attempted to generate a {keyword} operation, which is not allowed. "
+                    f"This system only supports SELECT queries to read data, not modify it. "
+                    f"Please rephrase your question to ask about existing data (e.g., 'Show me customers that were created...' instead of 'Create customers...')."
                 )
 
         return cleaned
