@@ -137,9 +137,9 @@ app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 # Query workflow endpoints
 app.include_router(queries.router, prefix="/api", tags=["Queries"])
 
-# TODO: Add admin endpoints
-# from backend.app.api import admin
-# app.include_router(admin.router, prefix="/api", tags=["Admin"])
+# Admin endpoints
+from backend.app.api import admin
+app.include_router(admin.router, prefix="/api", tags=["Admin"])
 
 # TODO: Add health check endpoint
 # from backend.app.api import health

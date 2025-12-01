@@ -1,4 +1,4 @@
-Current driver status
+Current driver’s status
 ```sql
 SELECT
     asset_driver.name,

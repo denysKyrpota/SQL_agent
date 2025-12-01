@@ -580,6 +580,53 @@ Your SQL query:"""
 
         return cleaned
 
+    async def generate_embedding(self, text: str) -> list[float]:
+        """
+        Generate embedding vector for text using OpenAI embeddings API.
+
+        Used for RAG-based similarity search in knowledge base.
+
+        Args:
+            text: Text to generate embedding for (SQL query or question)
+
+        Returns:
+            list[float]: Embedding vector (1536 dimensions for text-embedding-3-small)
+
+        Raises:
+            LLMServiceUnavailableError: If OpenAI API fails after retries
+
+        Example:
+            >>> service = LLMService()
+            >>> embedding = await service.generate_embedding("SELECT * FROM users")
+            >>> len(embedding)
+            1536
+        """
+        if not self.client:
+            raise LLMServiceUnavailableError("OpenAI API key not configured")
+
+        logger.debug(f"Generating embedding for text ({len(text)} characters)")
+
+        try:
+            response = await self.client.embeddings.create(
+                model=settings.openai_embedding_model,
+                input=text
+            )
+
+            embedding = response.data[0].embedding
+
+            logger.debug(
+                f"Generated embedding: {len(embedding)} dimensions, "
+                f"{response.usage.total_tokens} tokens used"
+            )
+
+            return embedding
+
+        except Exception as e:
+            logger.error(f"Error generating embedding: {e}", exc_info=True)
+            raise LLMServiceUnavailableError(
+                f"Failed to generate embedding: {e}"
+            ) from e
+
 
 class LLMServiceUnavailableError(Exception):
     """Raised when OpenAI API is unavailable after retries."""

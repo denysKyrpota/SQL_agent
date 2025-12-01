@@ -18,8 +18,10 @@ from backend.app.models.query import QueryAttempt as QueryAttemptModel
 from backend.app.services.llm_service import LLMService, LLMServiceUnavailableError
 from backend.app.services.schema_service import SchemaService
 from backend.app.services.knowledge_base_service import KnowledgeBaseService
+from backend.app.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class QueryService:
@@ -254,18 +256,36 @@ class QueryService:
 
             logger.debug(f"Filtered schema size: {len(schema_text)} characters")
 
-            # Stage 2: Load knowledge base examples
-            logger.info("Stage 2: Loading knowledge base examples")
-            kb_examples = await self.kb.find_similar_examples(
+            # Stage 2: Generate question embedding and find similar KB examples
+            logger.info("Stage 2: Generating question embedding and finding similar examples")
+
+            # Generate embedding for the user's question
+            question_embedding = await self.llm.generate_embedding(natural_language_query)
+
+            # Find similar examples using embedding-based search
+            kb_examples, max_similarity = await self.kb.find_similar_examples(
                 question=natural_language_query,
+                question_embedding=question_embedding,
                 top_k=3
             )
 
-            example_sqls = [ex.sql for ex in kb_examples]
-            logger.info(f"Loaded {len(example_sqls)} KB examples")
+            logger.info(
+                f"Found {len(kb_examples)} similar KB examples. "
+                f"Max similarity: {max_similarity:.3f}"
+            )
 
-            # Stage 3: Generate SQL using LLM
-            logger.info("Stage 3: Generating SQL with LLM")
+            # Check if we have a high-similarity match
+            if max_similarity >= settings.rag_similarity_threshold and kb_examples:
+                logger.info(
+                    f"High similarity match found ({max_similarity:.3f} >= {settings.rag_similarity_threshold}). "
+                    f"Returning KB example: {kb_examples[0].title}"
+                )
+                return kb_examples[0].sql
+
+            # Stage 3: Generate SQL using LLM if no exact match
+            example_sqls = [ex.sql for ex in kb_examples]
+            logger.info(f"No exact match. Generating SQL with LLM using {len(example_sqls)} examples as context")
+
             generated_sql = await self.llm.generate_sql(
                 question=natural_language_query,
                 schema_text=schema_text,

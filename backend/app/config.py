@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # Temperature for OpenAI API (0.0 = deterministic, 1.0 = creative)
     openai_temperature: float = 0.0
 
+    # OpenAI model for embeddings
+    openai_embedding_model: str = "text-embedding-3-small"
+
+    # Similarity threshold for RAG (0.0 to 1.0)
+    # If similarity is above this threshold, return the example directly
+    rag_similarity_threshold: float = 0.85
+
     # =========================================================================
     # Authentication Configuration
     # =========================================================================

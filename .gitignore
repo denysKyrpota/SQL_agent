@@ -44,6 +44,9 @@ data/app_data/*.db-wal
 data/exports/*
 !data/exports/.gitkeep
 
+# Knowledge Base Embeddings (generated, should not be committed)
+data/knowledge_base/embeddings.json
+
 # Environment variables
 .env
 .env.local

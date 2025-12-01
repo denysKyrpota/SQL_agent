@@ -2,16 +2,21 @@
 Knowledge Base Service for loading and searching SQL examples.
 
 Loads SQL examples from data/knowledge_base/ and provides similarity search
-to find relevant examples for the LLM context.
+to find relevant examples for the LLM context using embeddings.
 """
 
+import json
 import logging
+import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
+from backend.app.config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 @dataclass
@@ -45,6 +50,7 @@ class KnowledgeBaseService:
         """Initialize the knowledge base service with empty cache."""
         self._examples_cache: list[KBExample] | None = None
         self._kb_directory = Path("data/knowledge_base")
+        self._embeddings_file = Path("data/knowledge_base/embeddings.json")
 
     def load_examples(self) -> list[KBExample]:
         """
@@ -222,6 +228,7 @@ class KnowledgeBaseService:
         Get cached examples, loading from disk if not cached.
 
         Implements lazy loading and caching for performance.
+        Also loads embeddings if available.
 
         Returns:
             list[KBExample]: All SQL examples
@@ -229,6 +236,7 @@ class KnowledgeBaseService:
         if self._examples_cache is None:
             logger.info("Examples not cached, loading from disk")
             self._examples_cache = self.load_examples()
+            self.load_embeddings()  # Load embeddings after loading examples
         else:
             logger.debug("Returning cached examples")
 
@@ -284,39 +292,226 @@ class KnowledgeBaseService:
 
         return matching
 
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """
+        Calculate cosine similarity between two vectors.
+
+        Cosine similarity measures the cosine of the angle between two vectors,
+        ranging from -1 (opposite) to 1 (identical).
+
+        Args:
+            vec1: First vector
+            vec2: Second vector
+
+        Returns:
+            float: Cosine similarity score (0.0 to 1.0)
+
+        Example:
+            >>> service = KnowledgeBaseService()
+            >>> similarity = service._cosine_similarity([1, 0, 0], [1, 0, 0])
+            >>> similarity
+            1.0
+        """
+        if len(vec1) != len(vec2):
+            raise ValueError(f"Vectors must have same length: {len(vec1)} vs {len(vec2)}")
+
+        # Calculate dot product
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+
+        # Calculate magnitudes
+        magnitude1 = math.sqrt(sum(a * a for a in vec1))
+        magnitude2 = math.sqrt(sum(b * b for b in vec2))
+
+        # Avoid division by zero
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+
+        # Calculate cosine similarity
+        similarity = dot_product / (magnitude1 * magnitude2)
+
+        return similarity
+
     async def find_similar_examples(
         self,
         question: str,
+        question_embedding: list[float] | None = None,
         top_k: int = 3
-    ) -> list[KBExample]:
+    ) -> tuple[list[KBExample], float]:
         """
-        Find most similar examples for a given question.
+        Find most similar examples for a given question using embeddings.
 
-        MVP IMPLEMENTATION: Returns all examples (no embeddings yet).
-        With only 7 examples, we can send all of them to the LLM.
-
-        Future enhancement: Use embeddings + cosine similarity for
-        smarter example selection when KB grows larger.
+        If embeddings are available, uses cosine similarity to find the most
+        relevant examples. If the highest similarity is above the threshold,
+        returns that example as the primary match.
 
         Args:
             question: User's natural language question
+            question_embedding: Pre-computed embedding for the question (optional)
             top_k: Number of examples to return
 
         Returns:
-            list[KBExample]: Most similar examples (or all if < top_k)
+            tuple: (list of similar examples, highest similarity score)
+                   Examples are sorted by similarity (most similar first)
+
+        Example:
+            >>> service = KnowledgeBaseService()
+            >>> examples, max_sim = await service.find_similar_examples(
+            ...     "Show current driver status",
+            ...     question_embedding=[0.1, 0.2, ...]
+            ... )
+            >>> if max_sim > 0.85:
+            ...     print(f"Exact match found: {examples[0].title}")
         """
         examples = self.get_examples()
 
-        # MVP: Return all examples (only 7, so LLM can handle them all)
+        # Check if embeddings are available
+        embeddings_available = all(ex.embedding is not None for ex in examples)
+
+        if not embeddings_available or question_embedding is None:
+            # Fallback: Return all examples without similarity ranking
+            logger.info(
+                f"Embeddings not available, returning first {top_k} examples"
+            )
+            return examples[:top_k], 0.0
+
+        # Calculate similarity scores for all examples
+        similarities: list[tuple[KBExample, float]] = []
+
+        for example in examples:
+            if example.embedding is None:
+                continue
+
+            similarity = self._cosine_similarity(question_embedding, example.embedding)
+            similarities.append((example, similarity))
+
+        # Sort by similarity (highest first)
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        # Get top K examples
+        top_examples = [ex for ex, _ in similarities[:top_k]]
+        max_similarity = similarities[0][1] if similarities else 0.0
+
         logger.info(
-            f"Returning all {len(examples)} examples (embeddings not implemented)"
+            f"Found {len(top_examples)} similar examples. "
+            f"Highest similarity: {max_similarity:.3f}"
         )
 
-        # If we have more examples than requested, return the first top_k
-        if len(examples) > top_k:
-            return examples[:top_k]
+        # Log top matches for debugging
+        for i, (example, sim) in enumerate(similarities[:top_k]):
+            logger.debug(f"  {i+1}. {example.title}: {sim:.3f}")
 
-        return examples
+        return top_examples, max_similarity
+
+    def save_embeddings(self) -> None:
+        """
+        Save embeddings to disk as JSON file.
+
+        Persists embeddings so they don't need to be regenerated on restart.
+        """
+        examples = self.get_examples()
+
+        embeddings_data = []
+        for example in examples:
+            embeddings_data.append({
+                "filename": example.filename,
+                "embedding": example.embedding
+            })
+
+        with open(self._embeddings_file, 'w') as f:
+            json.dump(embeddings_data, f)
+
+        logger.info(f"Saved embeddings for {len(embeddings_data)} examples to {self._embeddings_file}")
+
+    def load_embeddings(self) -> None:
+        """
+        Load embeddings from disk and attach to examples.
+
+        If embeddings file doesn't exist, silently skips loading.
+        """
+        if not self._embeddings_file.exists():
+            logger.info("No embeddings file found, skipping load")
+            return
+
+        try:
+            with open(self._embeddings_file, 'r') as f:
+                embeddings_data = json.load(f)
+
+            examples = self.get_examples()
+
+            # Create a map of filename to embedding
+            embedding_map = {item["filename"]: item["embedding"] for item in embeddings_data}
+
+            # Attach embeddings to examples
+            loaded_count = 0
+            for example in examples:
+                if example.filename in embedding_map:
+                    example.embedding = embedding_map[example.filename]
+                    loaded_count += 1
+
+            logger.info(f"Loaded embeddings for {loaded_count}/{len(examples)} examples")
+
+        except Exception as e:
+            logger.warning(f"Failed to load embeddings: {e}")
+
+    async def generate_embeddings(self, llm_service) -> dict[str, Any]:
+        """
+        Generate embeddings for all examples using OpenAI.
+
+        This should be called once initially or when new examples are added.
+
+        Args:
+            llm_service: LLMService instance for generating embeddings
+
+        Returns:
+            dict: Statistics about embedding generation
+
+        Example:
+            >>> from backend.app.services.llm_service import LLMService
+            >>> kb_service = KnowledgeBaseService()
+            >>> llm_service = LLMService()
+            >>> stats = await kb_service.generate_embeddings(llm_service)
+            >>> print(f"Generated {stats['embeddings_generated']} embeddings")
+        """
+        examples = self.get_examples()
+
+        embeddings_generated = 0
+        embeddings_skipped = 0
+
+        logger.info(f"Generating embeddings for {len(examples)} examples")
+
+        for example in examples:
+            if example.embedding is not None:
+                logger.debug(f"Skipping {example.filename} (already has embedding)")
+                embeddings_skipped += 1
+                continue
+
+            try:
+                # Generate embedding from example's SQL + title + description
+                text_to_embed = f"{example.title}\n{example.description or ''}\n{example.sql}"
+
+                embedding = await llm_service.generate_embedding(text_to_embed)
+                example.embedding = embedding
+                embeddings_generated += 1
+
+                logger.info(f"Generated embedding for {example.filename}")
+
+            except Exception as e:
+                logger.error(f"Failed to generate embedding for {example.filename}: {e}")
+                continue
+
+        # Save embeddings to disk
+        self.save_embeddings()
+
+        stats = {
+            "total_examples": len(examples),
+            "embeddings_generated": embeddings_generated,
+            "embeddings_skipped": embeddings_skipped,
+            "embeddings_available": sum(1 for ex in examples if ex.embedding is not None)
+        }
+
+        logger.info(f"Embedding generation complete: {stats}")
+
+        return stats
 
     def refresh_examples(self) -> list[KBExample]:
         """
@@ -329,7 +524,9 @@ class KnowledgeBaseService:
         """
         logger.info("Refreshing knowledge base cache (admin request)")
         self._examples_cache = None
-        return self.load_examples()
+        examples = self.load_examples()
+        self.load_embeddings()  # Load embeddings after loading examples
+        return examples
 
     def get_example_by_filename(self, filename: str) -> KBExample | None:
         """
