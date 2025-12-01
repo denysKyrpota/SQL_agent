@@ -206,7 +206,7 @@ export type ButtonSize = 'small' | 'medium' | 'large';
  */
 export interface ButtonProps {
   children: React.ReactNode;
-  onClick: () => void;
+  onClick?: () => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
   disabled?: boolean;

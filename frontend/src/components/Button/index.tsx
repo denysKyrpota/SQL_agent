@@ -21,7 +21,7 @@ const Button: React.FC<ButtonProps> = ({
   ariaLabel,
 }) => {
   const handleClick = () => {
-    if (!disabled && !loading) {
+    if (!disabled && !loading && onClick) {
       onClick();
     }
   };

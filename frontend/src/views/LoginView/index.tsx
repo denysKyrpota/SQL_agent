@@ -6,8 +6,7 @@ import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/Button';
-import TextArea from '@/components/TextArea';
-import './LoginView.module.css';
+import styles from './LoginView.module.css';
 
 const LoginView: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +15,7 @@ const LoginView: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -47,26 +47,32 @@ const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="login-view">
-      <div className="login-container">
-        <div className="login-header">
-          <h1>SQL AI Agent</h1>
-          <p>Sign in to query your database</p>
+    <div className={styles.loginView}>
+      <div className={styles.loginContainer}>
+        <div className={styles.logoSection}>
+          <div className={styles.logo}>
+            <div className={styles.logoPlaceholder}>
+              <span className={styles.logoText}>SQL</span>
+              <span className={styles.logoSubtext}>AI Agent</span>
+            </div>
+          </div>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <h2 className={styles.signInTitle}>Please Sign In</h2>
+
+        <form className={styles.loginForm} onSubmit={handleSubmit}>
           {error && (
-            <div className="login-error" role="alert">
+            <div className={styles.loginError} role="alert">
               {error}
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
+          <div className={styles.formGroup}>
+            <label htmlFor="username" className={styles.formLabel}>Email</label>
             <input
               id="username"
               type="text"
-              className="form-input"
+              className={styles.formInput}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isAuthenticating}
@@ -76,19 +82,43 @@ const LoginView: React.FC = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isAuthenticating}
-              autoComplete="current-password"
-              minLength={8}
-              required
-            />
+          <div className={styles.formGroup}>
+            <label htmlFor="password" className={styles.formLabel}>Password</label>
+            <div className={styles.passwordInputWrapper}>
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                className={styles.formInput}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isAuthenticating}
+                autoComplete="current-password"
+                minLength={8}
+                required
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.forgotPasswordWrapper}>
+            <a href="#" className={styles.forgotPassword}>Forgot password?</a>
           </div>
 
           <Button
@@ -97,12 +127,12 @@ const LoginView: React.FC = () => {
             disabled={isAuthenticating}
             fullWidth
           >
-            {isAuthenticating ? 'Signing in...' : 'Sign In'}
+            {isAuthenticating ? 'Signing in...' : 'Log in'}
           </Button>
         </form>
 
-        <div className="login-footer">
-          <p className="demo-credentials">
+        <div className={styles.loginFooter}>
+          <p className={styles.demoCredentials}>
             <strong>Demo credentials:</strong><br />
             Username: <code>admin</code> / Password: <code>admin123</code><br />
             Username: <code>testuser</code> / Password: <code>testpass123</code>
