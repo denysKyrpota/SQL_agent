@@ -71,6 +71,9 @@ class QueryAttempt(Base):
         remote_side=[id],
         foreign_keys=[original_attempt_id],
     )
+    message: Mapped["Message | None"] = relationship(
+        "Message", back_populates="query_attempt", uselist=False
+    )
 
     def __repr__(self) -> str:
         return f"<QueryAttempt(id={self.id}, user_id={self.user_id}, status={self.status!r})>"

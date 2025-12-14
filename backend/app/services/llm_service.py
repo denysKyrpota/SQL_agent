@@ -29,18 +29,20 @@ class LLMService:
 
     def __init__(self):
         """Initialize the LLM service with OpenAI client."""
+        self.model = settings.openai_model
         if not settings.openai_api_key:
             logger.warning("OpenAI API key not configured")
             self.client = None
         else:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
-            logger.info(f"LLM Service initialized with model: {settings.openai_model}")
+            logger.info(f"LLM Service initialized with model: {self.model}")
 
     async def select_relevant_tables(
         self,
         table_names: list[str],
         question: str,
-        max_tables: int = 10
+        max_tables: int = 10,
+        conversation_history: list[dict[str, str]] | None = None
     ) -> list[str]:
         """
         Stage 1: Select relevant tables from full table list.
@@ -53,6 +55,7 @@ class LLMService:
             table_names: List of all available table names (279 tables)
             question: User's natural language question
             max_tables: Maximum number of tables to select (default: 10)
+            conversation_history: Optional conversation history for context
 
         Returns:
             list[str]: Selected table names (typically 5-10 tables)
@@ -78,20 +81,31 @@ class LLMService:
         )
 
         # Build prompt for table selection
-        prompt = self._build_table_selection_prompt(table_names, question, max_tables)
+        prompt = self._build_table_selection_prompt(
+            table_names, question, max_tables, conversation_history
+        )
+
+        # Build messages array with conversation history
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a database expert. Your task is to select only the most relevant database tables needed to answer a given question."
+            }
+        ]
+
+        # Add conversation history if provided
+        if conversation_history:
+            messages.extend(conversation_history)
+
+        # Add current user prompt
+        messages.append({
+            "role": "user",
+            "content": prompt
+        })
 
         # Call OpenAI with retry logic
         response_text = await self._call_openai_with_retry(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a database expert. Your task is to select only the most relevant database tables needed to answer a given question."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
+            messages=messages,
             max_tokens=500,  # Table names only, should be short
             temperature=0.0  # Deterministic selection
         )
@@ -109,7 +123,8 @@ class LLMService:
         self,
         table_names: list[str],
         question: str,
-        max_tables: int
+        max_tables: int,
+        conversation_history: list[dict[str, str]] | None = None
     ) -> str:
         """
         Build prompt for Stage 1: Table selection.
@@ -118,6 +133,7 @@ class LLMService:
             table_names: All available table names
             question: User's question
             max_tables: Maximum tables to select
+            conversation_history: Optional conversation history for context
 
         Returns:
             str: Formatted prompt
@@ -125,13 +141,17 @@ class LLMService:
         # Format table names as a readable list
         tables_list = "\n".join(f"- {name}" for name in sorted(table_names))
 
+        context_note = ""
+        if conversation_history:
+            context_note = "\nNote: Consider the conversation history above when selecting tables."
+
         prompt = f"""You are analyzing a PostgreSQL database to answer a question.
 
 DATABASE TABLES ({len(table_names)} total):
 {tables_list}
 
 USER QUESTION:
-"{question}"
+"{question}"{context_note}
 
 TASK:
 Select the {max_tables} most relevant tables needed to answer this question.
@@ -152,7 +172,8 @@ Your response:"""
         self,
         question: str,
         schema_text: str,
-        examples: list[str]
+        examples: list[str],
+        conversation_history: list[dict[str, str]] | None = None
     ) -> str:
         """
         Stage 2: Generate SQL query using filtered schema and examples.
@@ -164,6 +185,7 @@ Your response:"""
             question: User's natural language question
             schema_text: Formatted schema for selected tables only
             examples: List of similar SQL examples from knowledge base
+            conversation_history: Optional conversation history for context
 
         Returns:
             str: Generated PostgreSQL SELECT query
@@ -197,58 +219,69 @@ Your response:"""
             )
 
         # Build prompt for SQL generation
-        prompt = self._build_sql_generation_prompt(question, schema_text, examples)
+        prompt = self._build_sql_generation_prompt(
+            question, schema_text, examples, conversation_history
+        )
+
+        # Build messages with conversation history
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert PostgreSQL developer who generates ONLY read-only SELECT queries. "
+                    "ABSOLUTE RULE: Your response MUST start with 'SELECT' or 'WITH' (for CTEs). "
+                    "FORBIDDEN WORDS IN YOUR RESPONSE: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, TRUNCATE. "
+                    "These commands are COMPLETELY PROHIBITED - do not use them anywhere in your SQL. "
+                    "\n\n"
+                    "CRITICAL: When you see words like 'deleted', 'created', 'updated' in questions, these refer to:\n"
+                    "- 'deleted' = a boolean column (deleted = true/false) or a timestamp (deleted_at)\n"
+                    "- 'created' = a timestamp column (created_at) showing when records were created\n"
+                    "- 'updated' = a timestamp column (updated_at) showing when records were updated\n"
+                    "- 'deactivated' = a timestamp column (deactivated_at) or status field\n"
+                    "\n"
+                    "You are working with a READ-ONLY database. You can ONLY retrieve data, never modify it. "
+                    "Every query must be a SELECT statement that reads existing data."
+                )
+            },
+            {
+                "role": "user",
+                "content": "Show me all created customers"
+            },
+            {
+                "role": "assistant",
+                "content": "SELECT * FROM customers WHERE created_at IS NOT NULL;"
+            },
+            {
+                "role": "user",
+                "content": "Get deleted records from activities"
+            },
+            {
+                "role": "assistant",
+                "content": "SELECT * FROM activities WHERE deleted = true;"
+            },
+            {
+                "role": "user",
+                "content": "Deactivated created customers this month"
+            },
+            {
+                "role": "assistant",
+                "content": "SELECT * FROM customers WHERE deactivated_at IS NOT NULL AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE);"
+            },
+        ]
+
+        # Add conversation history if provided
+        if conversation_history:
+            messages.extend(conversation_history)
+
+        # Add current user prompt
+        messages.append({
+            "role": "user",
+            "content": prompt
+        })
 
         # Call OpenAI with retry logic using few-shot examples to reinforce SELECT-only behavior
         response_text = await self._call_openai_with_retry(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert PostgreSQL developer who generates ONLY read-only SELECT queries. "
-                        "ABSOLUTE RULE: Your response MUST start with 'SELECT' or 'WITH' (for CTEs). "
-                        "FORBIDDEN WORDS IN YOUR RESPONSE: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, TRUNCATE. "
-                        "These commands are COMPLETELY PROHIBITED - do not use them anywhere in your SQL. "
-                        "\n\n"
-                        "CRITICAL: When you see words like 'deleted', 'created', 'updated' in questions, these refer to:\n"
-                        "- 'deleted' = a boolean column (deleted = true/false) or a timestamp (deleted_at)\n"
-                        "- 'created' = a timestamp column (created_at) showing when records were created\n"
-                        "- 'updated' = a timestamp column (updated_at) showing when records were updated\n"
-                        "- 'deactivated' = a timestamp column (deactivated_at) or status field\n"
-                        "\n"
-                        "You are working with a READ-ONLY database. You can ONLY retrieve data, never modify it. "
-                        "Every query must be a SELECT statement that reads existing data."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": "Show me all created customers"
-                },
-                {
-                    "role": "assistant",
-                    "content": "SELECT * FROM customers WHERE created_at IS NOT NULL;"
-                },
-                {
-                    "role": "user",
-                    "content": "Get deleted records from activities"
-                },
-                {
-                    "role": "assistant",
-                    "content": "SELECT * FROM activities WHERE deleted = true;"
-                },
-                {
-                    "role": "user",
-                    "content": "Deactivated created customers this month"
-                },
-                {
-                    "role": "assistant",
-                    "content": "SELECT * FROM customers WHERE deactivated_at IS NOT NULL AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE);"
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
+            messages=messages,
             max_tokens=settings.openai_max_tokens,
             temperature=settings.openai_temperature
         )
@@ -265,7 +298,8 @@ Your response:"""
         self,
         question: str,
         schema_text: str,
-        examples: list[str]
+        examples: list[str],
+        conversation_history: list[dict[str, str]] | None = None
     ) -> str:
         """
         Build prompt for Stage 2: SQL generation.
@@ -274,6 +308,7 @@ Your response:"""
             question: User's question
             schema_text: Filtered schema formatted for LLM
             examples: Knowledge base examples
+            conversation_history: Optional conversation history for context
 
         Returns:
             str: Formatted prompt
@@ -292,13 +327,17 @@ SIMILAR EXAMPLES FROM KNOWLEDGE BASE:
         else:
             examples_section = ""
 
+        context_note = ""
+        if conversation_history:
+            context_note = "\nNote: Consider the conversation history above when generating the SQL query. If the user is asking for modifications or refinements, build upon previous queries."
+
         prompt = f"""⚠️ MANDATORY INSTRUCTION: Generate ONLY a SELECT query. Do NOT use DELETE, INSERT, UPDATE, CREATE, DROP, ALTER, or TRUNCATE.
 
 DATABASE SCHEMA:
 {schema_text}
 {examples_section}
 USER QUESTION:
-"{question}"
+"{question}"{context_note}
 
 ⚠️ CRITICAL: Words like "deleted", "created", "updated", "deactivated" in questions refer to COLUMN NAMES, NOT SQL commands!
 
