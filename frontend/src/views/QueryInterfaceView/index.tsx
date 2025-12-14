@@ -14,6 +14,8 @@ import SqlPreviewSection from './components/SqlPreviewSection';
 import ErrorAlert from './components/ErrorAlert';
 import ResultsSection from './components/ResultsSection';
 import Toast from '@/components/Toast';
+import ChatPanel from '@/components/ChatPanel';
+import Button from '@/components/Button';
 import {
   createQuery,
   executeQuery,
@@ -44,6 +46,10 @@ const QueryInterfaceView: React.FC = () => {
     isExecuting: false,
     loadingStage: null,
   });
+
+  // Chat panel state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<number | undefined>(undefined);
 
   // Toast notification state
   const [toast, setToast] = useState<{
@@ -366,6 +372,96 @@ const QueryInterfaceView: React.FC = () => {
     }));
   };
 
+  // Handle query execution from chat
+  const handleChatQueryExecute = async (queryAttemptId: number) => {
+    setQueryState(prev => ({
+      ...prev,
+      queryId: queryAttemptId,
+      isExecuting: true,
+      loadingStage: 'execution',
+      error: null,
+    }));
+
+    try {
+      const response = await executeQuery(queryAttemptId);
+
+      if (response.status === 'failed_execution') {
+        setQueryState(prev => ({
+          ...prev,
+          isExecuting: false,
+          loadingStage: null,
+          error: {
+            type: 'execution',
+            message: getErrorMessage('execution'),
+            detail: response.error_message || undefined,
+          },
+        }));
+        return;
+      }
+
+      if (response.status === 'timeout') {
+        setQueryState(prev => ({
+          ...prev,
+          isExecuting: false,
+          loadingStage: null,
+          error: {
+            type: 'timeout',
+            message: getErrorMessage('timeout'),
+            detail: response.error_message || undefined,
+          },
+        }));
+        return;
+      }
+
+      // Success
+      setQueryState(prev => ({
+        ...prev,
+        isExecuting: false,
+        loadingStage: null,
+        status: response.status,
+        executionTimeMs: response.execution_ms,
+        results: response.results,
+        currentPage: 1,
+      }));
+
+      // Auto-scroll to results
+      setTimeout(() => {
+        const resultsSection = document.querySelector('.results-section');
+        resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+    } catch (error) {
+      console.error('Query execution error:', error);
+
+      let errorType: 'execution' | 'timeout' | 'network' = 'execution';
+      let errorMessage = 'An unexpected error occurred during execution';
+      let errorDetail: string | undefined;
+
+      if (isAPIError(error)) {
+        if (error.status === 408 || error.errorCode === 'TIMEOUT') {
+          errorType = 'timeout';
+          errorMessage = getErrorMessage('timeout');
+        } else if (error.errorCode === 'NETWORK_ERROR') {
+          errorType = 'network';
+          errorMessage = error.detail;
+        } else {
+          errorDetail = error.detail;
+        }
+      }
+
+      setQueryState(prev => ({
+        ...prev,
+        isExecuting: false,
+        loadingStage: null,
+        error: {
+          type: errorType,
+          message: errorMessage,
+          detail: errorDetail,
+        },
+      }));
+    }
+  };
+
   return (
     <main className={styles['query-interface']} aria-label="Query Interface">
       {/* Toast Notifications */}
@@ -390,6 +486,29 @@ const QueryInterfaceView: React.FC = () => {
             examples={exampleQuestions}
           />
         </div>
+
+        {/* Chat Toggle Button */}
+        <div className={(styles as any)['chat-toggle-container']}>
+          <Button
+            variant="secondary"
+            onClick={() => setChatOpen(!chatOpen)}
+            className={(styles as any)['chat-toggle-button']}
+          >
+            {chatOpen ? '✕ Close Chat' : '💬 Open Chat (Conversational Mode)'}
+          </Button>
+        </div>
+
+        {/* Chat Panel */}
+        {chatOpen && (
+          <div className={(styles as any)['chat-panel-container']}>
+            <ChatPanel
+              conversationId={conversationId}
+              onQueryExecute={handleChatQueryExecute}
+              onConversationChange={setConversationId}
+              className={(styles as any)['chat-panel']}
+            />
+          </div>
+        )}
 
         {/* Loading Indicator */}
         {queryState.loadingStage && (

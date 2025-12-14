@@ -19,6 +19,7 @@ const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = false,
   ariaLabel,
+  className,
 }) => {
   const handleClick = () => {
     if (!disabled && !loading && onClick) {
@@ -32,6 +33,7 @@ const Button: React.FC<ButtonProps> = ({
     `button-${size}`,
     fullWidth ? 'button-full-width' : '',
     loading ? 'button-loading' : '',
+    className || '',
   ].filter(Boolean).join(' ');
 
   return (

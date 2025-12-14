@@ -83,12 +83,15 @@ export interface QueryFormProps {
 export interface TextAreaProps {
   value: string;
   onChange: (value: string) => void;
-  maxLength: number;
-  placeholder: string;
-  disabled: boolean;
+  maxLength?: number;
+  placeholder?: string;
+  disabled?: boolean;
   autoFocus?: boolean;
-  label: string;
-  id: string;
+  label?: string;
+  id?: string;
+  rows?: number;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  className?: string;
 }
 
 /**
@@ -194,7 +197,7 @@ export interface PaginationProps {
 /**
  * Button variant types
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 /**
  * Button size types
@@ -215,4 +218,5 @@ export interface ButtonProps {
   icon?: React.ReactNode;
   fullWidth?: boolean;
   ariaLabel?: string;
+  className?: string;
 }

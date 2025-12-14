@@ -12,12 +12,15 @@ import styles from './TextArea.module.css';
 const TextArea: React.FC<TextAreaProps> = ({
   value,
   onChange,
-  maxLength,
+  maxLength = 5000,
   placeholder,
-  disabled,
+  disabled = false,
   autoFocus = false,
   label,
   id,
+  rows = 4,
+  onKeyDown,
+  className,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,25 +51,29 @@ const TextArea: React.FC<TextAreaProps> = ({
     isNearLimit ? styles['textarea-warning'] : '',
     isAtLimit ? styles['textarea-error'] : '',
     disabled ? styles['textarea-disabled'] : '',
+    className || '',
   ].filter(Boolean).join(' ');
 
   return (
     <div className={styles['textarea-wrapper']}>
-      <label htmlFor={id} className={styles['textarea-label']}>
-        {label}
-      </label>
+      {label && (
+        <label htmlFor={id} className={styles['textarea-label']}>
+          {label}
+        </label>
+      )}
       <textarea
         ref={textareaRef}
         id={id}
         className={textareaClasses}
         value={value}
         onChange={handleChange}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
         maxLength={maxLength}
-        rows={4}
-        aria-describedby={`${id}-char-count`}
+        rows={rows}
+        aria-describedby={id ? `${id}-char-count` : undefined}
       />
     </div>
   );
