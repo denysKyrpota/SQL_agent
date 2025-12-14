@@ -1,5 +1,5 @@
-	Drivers with expired certificates
-```sql
+--	Drivers with expired certificates
+
 SELECT
     "Driver",
     "Driver code",
@@ -50,70 +50,3 @@ FROM (
 ) x
 WHERE latest_certificate = 1
     AND date_of_expiry < current_date;
-```
-
-Query Documentation
-Purpose
- Retrieve the most recent certifications for active drivers or students that have already expired.
-Tables and Joins
-asset_drivercertification → main table storing driver certifications and their dates.
-
-
-asset_driver → provides driver details (name, data_external_id).
-
-
-asset_driverstatuschange → provides current driver status (driver or student).
-
-
-asset_certification → stores certification names and status.
-
-
-LEFT JOINs ensure drivers and certifications are included even if related records are missing.
-
-
-Filters
-Only non-deleted and non-archived certifications (deleted = false, archived = false).
-
-
-Only active drivers (asset_driver.deleted = false) with external ID > 999.
-
-
-Certification is active (asset_certification.deactivated_at IS NULL).
-
-
-Only drivers or students (status IN ('driver','student')).
-
-
-Excludes test or placeholder driver names.
-
-
-latest_certificate = 1 → only the most recent certification per driver per type.
-
-
-date_of_expiry < current_date → only expired certifications.
-
-
-Output Columns
-Driver → name of the driver.
-
-
-Driver code → external identifier of the driver.
-
-
-Current driver status → current status of the driver.
-
-
-date_obtained → when the certification was obtained.
-
-
-date_of_expiry → expiration date of the certification.
-
-
-document_number → certification document number.
-
-
-Certificate → name of the certification.
-
-
-Result Set
- Each row represents the latest expired certification for a driver or student, showing driver details, certification info, and expiry date.
