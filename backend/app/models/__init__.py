@@ -9,6 +9,7 @@ from backend.app.models.user import User, Session
 from backend.app.models.query import QueryAttempt, QueryResultsManifest
 from backend.app.models.knowledge import SchemaSnapshot, KnowledgeBaseExample
 from backend.app.models.metrics import MetricsRollup
+from backend.app.models.chat import Conversation, Message
 
 __all__ = [
     "Base",
@@ -19,4 +20,6 @@ __all__ = [
     "SchemaSnapshot",
     "KnowledgeBaseExample",
     "MetricsRollup",
+    "Conversation",
+    "Message",
 ]

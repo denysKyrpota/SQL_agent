@@ -44,6 +44,17 @@ from backend.app.schemas.health import (
     HealthCheckResponse,
     ServiceStatus,
 )
+from backend.app.schemas.chat import (
+    CreateConversationRequest,
+    ConversationResponse,
+    ConversationListResponse,
+    MessageResponse,
+    SendMessageRequest,
+    SendMessageResponse,
+    ConversationMessagesResponse,
+    RegenerateMessageRequest,
+    EditMessageRequest,
+)
 
 __all__ = [
     # Auth
@@ -81,4 +92,14 @@ __all__ = [
     # Health
     "HealthCheckResponse",
     "ServiceStatus",
+    # Chat
+    "CreateConversationRequest",
+    "ConversationResponse",
+    "ConversationListResponse",
+    "MessageResponse",
+    "SendMessageRequest",
+    "SendMessageResponse",
+    "ConversationMessagesResponse",
+    "RegenerateMessageRequest",
+    "EditMessageRequest",
 ]

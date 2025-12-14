@@ -24,7 +24,43 @@
 /* Form container - 70% width, centered */
 .query-form {
   max-width: 70%;
-  margin: 0 auto 4rem auto;
+  margin: 0 auto 2rem auto;
+}
+
+/* Chat toggle container */
+.chat-toggle-container {
+  max-width: 70%;
+  margin: 0 auto 2rem auto;
+  text-align: center;
+}
+
+.chat-toggle-button {
+  min-width: 250px;
+}
+
+/* Chat panel container */
+.chat-panel-container {
+  max-width: 70%;
+  margin: 0 auto 3rem auto;
+  height: 600px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 600px;
+  }
+}
+
+.chat-panel {
+  height: 100%;
 }
 
 /* Content below form - full width with padding */
@@ -45,6 +81,11 @@
   .query-form {
     max-width: 75%;
   }
+
+  .chat-toggle-container,
+  .chat-panel-container {
+    max-width: 75%;
+  }
 }
 
 @media (max-width: 768px) {
@@ -55,6 +96,15 @@
 
   .query-form {
     max-width: 88%;
+  }
+
+  .chat-toggle-container,
+  .chat-panel-container {
+    max-width: 90%;
+  }
+
+  .chat-panel-container {
+    height: 500px;
   }
 
   .query-interface-container > *:not(.query-form):not(h1) {
@@ -70,5 +120,14 @@
 
   .query-form {
     max-width: 92%;
+  }
+
+  .chat-toggle-container,
+  .chat-panel-container {
+    max-width: 95%;
+  }
+
+  .chat-panel-container {
+    height: 400px;
   }
 }
