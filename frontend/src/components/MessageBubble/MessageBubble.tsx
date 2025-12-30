@@ -5,10 +5,11 @@
  * - User/assistant role styling
  * - SQL code blocks with syntax highlighting
  * - Execute button for generated queries
+ * - Copy button for SQL queries
  * - Edit/regenerate actions
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Message } from '@/services/chatService';
 import Button from '@/components/Button';
 import styles from './MessageBubble.module.css';
@@ -77,6 +78,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const hasSQL = message.query_attempt_id !== null;
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const handleExecute = () => {
     if (hasSQL && onExecuteQuery) {
@@ -93,6 +95,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const handleRegenerate = () => {
     if (onRegenerateMessage) {
       onRegenerateMessage(message.id);
+    }
+  };
+
+  const handleCopy = async () => {
+    const sql = extractSQL(message.content);
+    if (!sql) return;
+
+    try {
+      await navigator.clipboard.writeText(sql);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy SQL:', error);
     }
   };
 
@@ -148,6 +163,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               className={styles.actionButton}
             >
               Execute Query
+            </Button>
+          )}
+
+          {hasSQL && (
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={handleCopy}
+              className={styles.actionButton}
+            >
+              {copySuccess ? 'Copied!' : 'Copy SQL'}
             </Button>
           )}
         </div>
