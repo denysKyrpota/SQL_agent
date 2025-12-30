@@ -1,9 +1,0 @@
-[
-{"table_name":"customers","constraint_name":"customers_pkey","column_name":"customer_id"},
-{"table_name":"orders","constraint_name":"orders_pkey","column_name":"order_id"},
-{"table_name":"order_items","constraint_name":"order_items_pkey","column_name":"order_item_id"},
-{"table_name":"products","constraint_name":"products_pkey","column_name":"product_id"},
-{"table_name":"inventory","constraint_name":"inventory_pkey","column_name":"inventory_id"},
-{"table_name":"employees","constraint_name":"employees_pkey","column_name":"employee_id"},
-{"table_name":"departments","constraint_name":"departments_pkey","column_name":"department_id"}
-]

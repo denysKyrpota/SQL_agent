@@ -2,15 +2,19 @@
 
 This directory contains application data, including knowledge base examples, schema snapshots, database files, and query exports.
 
+**Important:** This directory is empty in the repository for security reasons. All data files are gitignored to protect your database structure and business logic.
+
 ## Directory Structure
 
 ```
 data/
-├── knowledge_base/      # SQL query examples for RAG
-├── schema/             # PostgreSQL schema JSON snapshots
+├── knowledge_base/      # SQL query examples for RAG (gitignored)
+├── schema/             # PostgreSQL schema JSON snapshots (gitignored)
 ├── app_data/           # SQLite database files (gitignored)
 └── exports/            # Query result CSV exports (gitignored)
 ```
+
+You must generate these files by connecting to your own PostgreSQL database.
 
 ## Knowledge Base (`knowledge_base/`)
 
@@ -29,22 +33,18 @@ FROM ...
 WHERE ...
 ```
 
-### Sample vs. Production Files
-
-- **Sample files** (`sample_*.sql`): Generic examples for demonstration
-- **Production files** (all other `.sql`): Your actual business queries (gitignored)
-
-**Current sample files:**
-- `sample_employees_by_department.sql` - Employee listing by department
-- `sample_orders_last_30_days.sql` - Recent orders with customer info
-- `sample_product_inventory_status.sql` - Product stock levels
-- `sample_monthly_sales_summary.sql` - Monthly sales aggregation
-
-### Using Your Own Knowledge Base
+### Creating Your Knowledge Base
 
 1. **Add your SQL examples:**
-   ```bash
-   cp your_queries/*.sql data/knowledge_base/
+
+   Create `.sql` files in `data/knowledge_base/` with this format:
+   ```sql
+   -- Title of the query
+   -- Description: Optional description
+
+   SELECT ...
+   FROM ...
+   WHERE ...
    ```
 
 2. **Generate embeddings:**
@@ -72,34 +72,15 @@ Contains PostgreSQL database schema snapshots in JSON format. The system uses th
 
 ### Schema Files
 
-Five JSON files provide complete schema information:
+When you generate your schema, five JSON files will be created:
 
 1. **`tables.json`** - List of all available tables
-   ```json
-   [{"table_schema":"public","table_name":"customers"}, ...]
-   ```
-
 2. **`columns__data_types__and_nullable_status.json`** - Column definitions
-   ```json
-   [{"table_name":"customers","column_name":"customer_id","data_type":"integer","is_nullable":"NO"}, ...]
-   ```
-
 3. **`primary_keys__system_catalog_version.json`** - Primary key constraints
-   ```json
-   [{"table_name":"customers","constraint_name":"customers_pkey","column_name":"customer_id"}, ...]
-   ```
-
 4. **`foreign_key_relationships__source_→_target.json`** - Foreign key relationships
-   ```json
-   [{"source_table":"orders","source_column":"customer_id","target_table":"customers","target_column":"customer_id"}, ...]
-   ```
+5. **`all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json`** - Complete schema
 
-5. **`all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json`** - Complete schema with descriptions
-
-### Sample vs. Production Schema
-
-- **Sample files** (`sample_*.json`): Generic e-commerce schema for demonstration
-- **Production files** (all other `.json`): Your actual database schema (gitignored)
+**All schema files are gitignored** to protect your database structure.
 
 ### Refreshing Schema
 
@@ -130,62 +111,59 @@ Stores CSV exports of query results (up to 10,000 rows per export).
 
 ### What NOT to Commit
 
-1. **Production Knowledge Base** - May contain business logic and sensitive queries
-2. **Production Schema Files** - Reveal database structure
+1. **Knowledge Base Files** - Contain business logic and sensitive queries
+2. **Schema Files** - Reveal database structure and table relationships
 3. **Database Files** - Contain user data and session tokens
 4. **CSV Exports** - May contain customer or business data
 5. **Embeddings** - Can be regenerated, no need to commit
 
 ### .gitignore Configuration
 
-The root `.gitignore` is configured to exclude all sensitive files:
+The root `.gitignore` excludes ALL data files automatically:
 
 ```gitignore
-# Exclude production data, allow samples
+# All data files are excluded for security
 data/knowledge_base/*.sql
 data/schema/*.json
-!data/knowledge_base/sample_*.sql
-!data/schema/sample_*.json
-
-# Exclude generated and runtime data
 data/knowledge_base/embeddings.json
 data/app_data/*.db*
 data/exports/*
 ```
 
+This ensures your database structure and business logic remain private.
+
 ## Getting Started
 
-### Using Sample Data (Development)
+### First-Time Setup
 
-The repository includes sample data that works out of the box:
-
-1. **No additional setup needed** - Sample files are committed
-2. **Generate embeddings:**
+1. **Configure PostgreSQL Connection:**
    ```bash
-   make db-init  # Initialize database
+   # Edit .env file
+   POSTGRES_URL=postgresql://user:password@host:port/dbname
+   ```
+
+2. **Initialize Application Database:**
+   ```bash
+   make db-init  # Creates SQLite database with default users
    python -m backend.app.main  # Start server
-   # On first run, generate embeddings via admin endpoint
    ```
 
-### Using Production Data (Deployment)
-
-1. **Remove sample files** (optional):
+3. **Generate Schema Snapshot:**
    ```bash
-   rm data/knowledge_base/sample_*.sql
-   rm data/schema/sample_*.json
+   # Login as admin and get token
+   curl -X POST http://localhost:8000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"admin123"}'
+
+   # Generate schema files
+   curl -X POST http://localhost:8000/api/admin/schema/refresh \
+     -H "Authorization: Bearer <admin_token>"
    ```
 
-2. **Add your data:**
+4. **Add Knowledge Base Examples:**
    ```bash
-   # Add knowledge base examples
-   cp your_queries/*.sql data/knowledge_base/
-
-   # Update POSTGRES_URL in .env
-   # Generate schema via admin endpoint
-   ```
-
-3. **Generate embeddings:**
-   ```bash
+   # Create .sql files in data/knowledge_base/
+   # Then generate embeddings
    curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
      -H "Authorization: Bearer <admin_token>"
    ```

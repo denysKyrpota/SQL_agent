@@ -44,12 +44,11 @@ data/app_data/*.db-wal
 data/exports/*
 !data/exports/.gitkeep
 
-# Real Production Data - DO NOT COMMIT
-# These contain sensitive business data from actual PostgreSQL database
+# Sensitive Data - DO NOT COMMIT
+# All knowledge base and schema files contain sensitive business/database information
+# Users must generate their own after connecting to their PostgreSQL database
 data/knowledge_base/*.sql
 data/schema/*.json
-!data/knowledge_base/sample_*.sql
-!data/schema/sample_*.json
 
 # Knowledge Base Embeddings (generated, should not be committed)
 data/knowledge_base/embeddings.json

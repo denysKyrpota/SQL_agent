@@ -188,66 +188,78 @@ npm run dev
 
 Frontend available at: http://localhost:5173
 
-## 📊 Using Sample Data
+## 📊 Setting Up Your Data
 
-This repository includes sample data to help you get started without connecting to a real PostgreSQL database.
+**This repository does NOT include sample data to protect database structure privacy.**
 
-### Sample Knowledge Base
+You must connect to your own PostgreSQL database and generate your own schema and knowledge base files.
 
-The `data/knowledge_base/` directory contains sample SQL queries:
-- `sample_employees_by_department.sql`
-- `sample_orders_last_30_days.sql`
-- `sample_product_inventory_status.sql`
-- `sample_monthly_sales_summary.sql`
+### Initial Setup
 
-These demonstrate the expected format for knowledge base examples.
-
-### Sample Schema
-
-The `data/schema/` directory contains sample PostgreSQL schema files:
-- `sample_tables.json` - List of available tables
-- `sample_columns__data_types__and_nullable_status.json` - Column definitions
-- `sample_primary_keys__system_catalog_version.json` - Primary key constraints
-- `sample_foreign_key_relationships__source_→_target.json` - Foreign key relationships
-- `sample_all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json` - Complete schema
-
-### Setting Up Your Own Data
-
-**For Production Use:**
-
-1. **Replace Sample Knowledge Base:**
+1. **Configure Your PostgreSQL Connection:**
    ```bash
-   # Remove sample files
-   rm data/knowledge_base/sample_*.sql
-
-   # Add your own SQL examples
-   cp your_examples/*.sql data/knowledge_base/
+   # Edit .env file
+   POSTGRES_URL=postgresql://user:password@host:port/dbname
    ```
 
-2. **Connect to Your PostgreSQL Database:**
-   - Update `POSTGRES_URL` in `.env` with your database credentials
-   - Generate schema snapshots:
-     ```bash
-     # Use the admin endpoint to refresh schema
-     curl -X POST http://localhost:8000/api/admin/schema/refresh \
-       -H "Authorization: Bearer <admin_token>"
-     ```
-
-3. **Generate Embeddings:**
+2. **Start the Backend:**
    ```bash
-   # Generate embeddings for your knowledge base examples
+   python -m backend.app.main
+   ```
+
+3. **Login as Admin:**
+   ```bash
+   # Get admin token
+   curl -X POST http://localhost:8000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"admin123"}'
+
+   # Save the token from response
+   ```
+
+4. **Generate Schema Snapshot:**
+   ```bash
+   # This reads your PostgreSQL schema and creates JSON files in data/schema/
+   curl -X POST http://localhost:8000/api/admin/schema/refresh \
+     -H "Authorization: Bearer <your_admin_token>"
+   ```
+
+### Knowledge Base Setup
+
+The knowledge base contains example SQL queries that help the AI generate better queries through RAG (Retrieval-Augmented Generation).
+
+1. **Create Knowledge Base Examples:**
+
+   Create `.sql` files in `data/knowledge_base/` with this format:
+   ```sql
+   -- Title of the query
+   -- Description: What this query does
+
+   SELECT
+       column1,
+       column2
+   FROM
+       your_table
+   WHERE
+       condition;
+   ```
+
+2. **Generate Embeddings:**
+   ```bash
+   # This creates embeddings for similarity search
    curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
-     -H "Authorization: Bearer <admin_token>"
+     -H "Authorization: Bearer <your_admin_token>"
    ```
 
-**Important Security Notes:**
-- Never commit `.env` files with real credentials
-- Never commit production schema files to public repositories
-- Never commit production knowledge base SQL files containing business logic
-- The `.gitignore` is configured to exclude real data:
-  - `data/knowledge_base/*.sql` (except `sample_*.sql`)
-  - `data/schema/*.json` (except `sample_*.json`)
-  - `.env` and `.env.local`
+### What Files Are Generated
+
+After setup, these directories will contain your data (all gitignored):
+
+- `data/schema/*.json` - PostgreSQL schema snapshots (5 files)
+- `data/knowledge_base/*.sql` - Your SQL examples
+- `data/knowledge_base/embeddings.json` - Vector embeddings (auto-generated)
+
+**Security Note:** All data files are automatically excluded from Git via `.gitignore` to protect your database structure and business logic.
 
 ## 🧪 Testing
 
