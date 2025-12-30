@@ -261,7 +261,7 @@ class ChatService:
 
             generated_sql = await self.llm.generate_sql(
                 question=request.content,
-                schema=filtered_schema,
+                schema_text=filtered_schema,
                 examples=similar_examples,
                 conversation_history=context_messages,
             )
@@ -398,7 +398,7 @@ class ChatService:
 
             generated_sql = await self.llm.generate_sql(
                 question=user_messages.content,
-                schema=filtered_schema,
+                schema_text=filtered_schema,
                 examples=similar_examples,
                 conversation_history=context_messages,
             )
