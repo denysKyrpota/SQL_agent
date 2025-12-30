@@ -1,0 +1,9 @@
+[
+{"source_table":"orders","source_column":"customer_id","target_table":"customers","target_column":"customer_id","constraint_name":"orders_customer_id_fkey"},
+{"source_table":"orders","source_column":"shipping_address_id","target_table":"addresses","target_column":"address_id","constraint_name":"orders_shipping_address_id_fkey"},
+{"source_table":"order_items","source_column":"order_id","target_table":"orders","target_column":"order_id","constraint_name":"order_items_order_id_fkey"},
+{"source_table":"order_items","source_column":"product_id","target_table":"products","target_column":"product_id","constraint_name":"order_items_product_id_fkey"},
+{"source_table":"inventory","source_column":"product_id","target_table":"products","target_column":"product_id","constraint_name":"inventory_product_id_fkey"},
+{"source_table":"employees","source_column":"department_id","target_table":"departments","target_column":"department_id","constraint_name":"employees_department_id_fkey"},
+{"source_table":"departments","source_column":"manager_id","target_table":"employees","target_column":"employee_id","constraint_name":"departments_manager_id_fkey"}
+]

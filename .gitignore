@@ -44,12 +44,28 @@ data/app_data/*.db-wal
 data/exports/*
 !data/exports/.gitkeep
 
+# Real Production Data - DO NOT COMMIT
+# These contain sensitive business data from actual PostgreSQL database
+data/knowledge_base/*.sql
+data/schema/*.json
+!data/knowledge_base/sample_*.sql
+!data/schema/sample_*.json
+
 # Knowledge Base Embeddings (generated, should not be committed)
 data/knowledge_base/embeddings.json
 
 # Environment variables
 .env
 .env.local
+
+# Claude settings (local only)
+.claude/settings.local.json
+
+# Windows temp files
+nul
+
+# Python virtual environments (Windows)
+venv_win/
 
 # Logs
 *.log

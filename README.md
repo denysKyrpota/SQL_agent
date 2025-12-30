@@ -188,6 +188,67 @@ npm run dev
 
 Frontend available at: http://localhost:5173
 
+## 📊 Using Sample Data
+
+This repository includes sample data to help you get started without connecting to a real PostgreSQL database.
+
+### Sample Knowledge Base
+
+The `data/knowledge_base/` directory contains sample SQL queries:
+- `sample_employees_by_department.sql`
+- `sample_orders_last_30_days.sql`
+- `sample_product_inventory_status.sql`
+- `sample_monthly_sales_summary.sql`
+
+These demonstrate the expected format for knowledge base examples.
+
+### Sample Schema
+
+The `data/schema/` directory contains sample PostgreSQL schema files:
+- `sample_tables.json` - List of available tables
+- `sample_columns__data_types__and_nullable_status.json` - Column definitions
+- `sample_primary_keys__system_catalog_version.json` - Primary key constraints
+- `sample_foreign_key_relationships__source_→_target.json` - Foreign key relationships
+- `sample_all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json` - Complete schema
+
+### Setting Up Your Own Data
+
+**For Production Use:**
+
+1. **Replace Sample Knowledge Base:**
+   ```bash
+   # Remove sample files
+   rm data/knowledge_base/sample_*.sql
+
+   # Add your own SQL examples
+   cp your_examples/*.sql data/knowledge_base/
+   ```
+
+2. **Connect to Your PostgreSQL Database:**
+   - Update `POSTGRES_URL` in `.env` with your database credentials
+   - Generate schema snapshots:
+     ```bash
+     # Use the admin endpoint to refresh schema
+     curl -X POST http://localhost:8000/api/admin/schema/refresh \
+       -H "Authorization: Bearer <admin_token>"
+     ```
+
+3. **Generate Embeddings:**
+   ```bash
+   # Generate embeddings for your knowledge base examples
+   curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
+     -H "Authorization: Bearer <admin_token>"
+   ```
+
+**Important Security Notes:**
+- Never commit `.env` files with real credentials
+- Never commit production schema files to public repositories
+- Never commit production knowledge base SQL files containing business logic
+- The `.gitignore` is configured to exclude real data:
+  - `data/knowledge_base/*.sql` (except `sample_*.sql`)
+  - `data/schema/*.json` (except `sample_*.json`)
+  - `.env` and `.env.local`
+
 ## 🧪 Testing
 
 ### Run All Tests

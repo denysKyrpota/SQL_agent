@@ -4,388 +4,393 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A full-stack SQL AI Agent that translates natural language queries into SQL and executes them against a PostgreSQL database. The system uses OpenAI's LLM with a two-stage SQL generation process and RAG-based knowledge base for improved accuracy.
+SQL AI Agent - A production-ready text-to-SQL application that converts natural language questions into PostgreSQL queries using GPT-4 and Retrieval-Augmented Generation (RAG). The system features a two-stage SQL generation pipeline with intelligent table selection and context-aware chat capabilities.
 
-**Key Stats:** 179 passing tests, 89% coverage, React 18 + FastAPI + PostgreSQL + OpenAI GPT-4
+**Architecture:** Three-tier (React frontend, FastAPI backend, dual databases)
+**Target Database:** PostgreSQL (read-only)
+**Application Database:** SQLite (users, sessions, query history, conversations)
 
-## Common Commands
+## Development Commands
 
-### Backend Development
+### Backend (Python)
 
 ```bash
-# Start backend server (port 8000)
+# Database management (Makefile)
+make db-init          # Initialize with default users (admin/admin123, testuser/testpass123)
+make db-init-clean    # Initialize without default users
+make db-reset         # Reset database (WARNING: deletes all data)
+make db-migrate       # Run pending migrations
+make db-status        # Show migration status
+make db-shell         # Open SQLite shell
+make generate-types   # Generate TypeScript types from Pydantic schemas
+
+# Development server
 python -m backend.app.main
-# or with uvicorn directly
+# or with auto-reload
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Initialize database with default users (admin/admin123, testuser/testpass123)
-python scripts/init_db.py
-# or
-make db-init
+# Testing
+make test                    # Run all tests (179 tests, 89% coverage)
+pytest tests/ -v             # Verbose output
+pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v  # Single test
+pytest tests/ --cov=backend/app --cov-report=html  # Coverage report
 
-# Run all tests
-pytest tests/ -v
-
-# Run tests with coverage
-pytest tests/ --cov=backend/app --cov-report=html
-
-# Run specific test file
-pytest tests/api/test_auth.py -v
-
-# Run single test
-pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v
-
-# Run tests without coverage (faster)
-python -m pytest tests/ -v --no-cov
+# Code quality
+black backend/               # Format
+flake8 backend/              # Lint
+mypy backend/                # Type check
+make clean                   # Remove cache files
 ```
 
-### Frontend Development
+### Frontend (Node.js)
 
 ```bash
 cd frontend
 
-# Start dev server (port 3000, proxies /api to localhost:8000)
-npm run dev
-
-# Type check
-npm run type-check
-
-# Lint
-npm run lint
-
-# Build for production
-npm run build
+npm install                  # Install dependencies
+npm run dev                  # Development server (http://localhost:5173)
+npm run build                # Production build
+npm run preview              # Preview production build
+npm run lint                 # ESLint
+npm run type-check           # TypeScript checking
 ```
 
-### Database Management
+## Core Architecture
+
+### Two-Stage SQL Generation Pipeline
+
+The system uses a sophisticated two-stage process to handle large database schemas (279 tables):
+
+**Stage 1: Table Selection** (`LLMService.select_relevant_tables()`)
+- Input: All table names (279) + user question + optional conversation history
+- LLM: GPT-4 with temperature=0.0 (deterministic)
+- Output: 5-10 most relevant tables
+- Purpose: Reduce context size to fit token limits
+
+**Stage 2: SQL Generation** (`LLMService.generate_sql()`)
+- Input: Filtered schema + user question + top-3 similar KB examples + conversation history
+- LLM: GPT-4 with configurable temperature (default 0.0)
+- Output: PostgreSQL SELECT query
+- Validation: SELECT-only enforcement, forbidden keyword detection
+
+**Key Services Interaction:**
+```
+QueryService.create_query_attempt()
+  ├─> SchemaService.get_table_names() → 279 tables
+  ├─> LLMService.select_relevant_tables() → Stage 1
+  ├─> SchemaService.filter_schema_by_tables() → Filtered schema
+  ├─> LLMService.generate_embedding() → Embedding for RAG
+  ├─> KnowledgeBaseService.find_similar_examples() → Top-3 examples
+  │   └─> If similarity >= 0.85, return KB example directly
+  └─> LLMService.generate_sql() → Stage 2
+```
+
+### RAG (Retrieval-Augmented Generation) System
+
+**Knowledge Base:**
+- Location: `data/knowledge_base/` (7 .sql example files)
+- Embeddings: Persisted in `embeddings.json` (1536-dim vectors)
+- Model: text-embedding-3-small
+- Similarity: Cosine similarity, top-3 examples
+- Threshold: 0.85 for direct KB match (bypasses LLM)
+
+**Refresh Commands:**
+```bash
+# Generate new embeddings for KB examples
+curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
+  -H "Authorization: Bearer <admin_token>"
+
+# Reload KB without restart
+curl -X POST http://localhost:8000/api/admin/knowledge-base/refresh \
+  -H "Authorization: Bearer <admin_token>"
+```
+
+### Chat Conversation System
+
+The chat system maintains conversation context across messages:
+
+**Architecture:**
+- Database: `conversations` (1) → `messages` (N)
+- Messages link to `query_attempts` when SQL is generated
+- Full conversation history passed to LLM for context-aware generation
+- Supports editing (creates branches) and regeneration (creates siblings)
+
+**Key Flow:**
+```
+ChatService.send_message()
+  ├─> Create/retrieve conversation
+  ├─> Store user message
+  ├─> Build conversation history (all previous messages)
+  ├─> QueryService.create_query_attempt(conversation_history=history)
+  │   └─> LLM uses context for refinements ("add WHERE clause", "top 10")
+  ├─> Create query_attempt linked to assistant message
+  └─> Return both user and assistant messages
+```
+
+**Frontend Integration:**
+- Initial state: Centered input form + Example Questions sidebar
+- Chat mode: Activates automatically on first submission
+- ChatPanel: Right sidebar (replaces examples), shows conversation history
+- MessageBubble: Displays messages with SQL code blocks, Execute/Copy buttons
+
+### Database Schema
+
+**SQLite (Application Data):**
+- `users` - Authentication (bcrypt passwords, role-based access)
+- `sessions` - 8-hour expiration, revokable tokens
+- `query_attempts` - Complete lifecycle tracking (not_executed → success/failed)
+- `query_results_manifest` - JSON storage, 500 rows/page, 10K export limit
+- `conversations` + `messages` - Chat threads with query linking
+- `schema_snapshots` - PostgreSQL schema cache
+
+**PostgreSQL (Target Database):**
+- Read-only access
+- 279 tables total
+- Schema loaded from JSON snapshots in `data/schema/`
+- Execution timeout: 30 seconds
+
+### Frontend Architecture
+
+**Component Structure:**
+```
+QueryInterfaceView (main orchestrator)
+  ├─> QueryForm (initial centered input)
+  ├─> ChatPanel (conversation UI, right sidebar in chat mode)
+  │   └─> MessageBubble (user/assistant messages, Execute/Copy buttons)
+  ├─> SqlPreviewSection (generated SQL display)
+  └─> ResultsSection (table + pagination + export)
+```
+
+**State Management:**
+- AuthContext (React Context) - Global auth state
+- Local component state - UI interactions
+- SessionStorage - Input persistence across refreshes
+- No Redux/Zustand - Vanilla React patterns
+
+**API Client Pattern:**
+- Centralized `apiClient.ts` with axios
+- Automatic error handling and response transformation
+- Session token via HTTP-only cookies
+- Request/response interceptors for auth
+
+## Important Code Patterns
+
+### Service Layer Communication
+
+All business logic lives in services (`backend/app/services/`), not API routes:
+
+```python
+# Good: API route delegates to service
+@router.post("/queries")
+async def create_query(request: QueryRequest, db: Session = Depends(get_db)):
+    return await query_service.create_query_attempt(db, request)
+
+# Bad: Business logic in API route
+@router.post("/queries")
+async def create_query(request: QueryRequest, db: Session = Depends(get_db)):
+    # Don't put LLM calls, schema filtering, etc. here
+```
+
+### Async/Await Consistency
+
+**Critical:** Always await async functions, especially:
+- `LLMService.select_relevant_tables()` - Returns coroutine
+- `LLMService.generate_sql()` - Returns coroutine
+- `KnowledgeBaseService.find_similar_examples()` - Returns tuple[list[KBExample], float]
+
+```python
+# Correct
+similar_kb_examples, max_sim = await kb.find_similar_examples(question)
+sql_examples = [ex.sql for ex in similar_kb_examples]
+
+# Wrong - creates coroutine object instead of data
+similar_kb_examples = kb.find_similar_examples(question)  # Missing await!
+```
+
+### Parameter Naming Conventions
+
+**LLMService method signatures:**
+- `select_relevant_tables(table_names=...)` - NOT `all_table_names`
+- `generate_sql(schema_text=...)` - NOT `schema`
+
+```python
+# Correct
+selected_tables = await llm.select_relevant_tables(
+    table_names=all_tables,  # table_names parameter
+    question=user_question
+)
+
+filtered_schema = schema.filter_schema_by_tables(selected_tables)
+
+sql = await llm.generate_sql(
+    schema_text=filtered_schema,  # schema_text parameter
+    question=user_question,
+    examples=sql_examples
+)
+```
+
+### Frontend Prop Synchronization
+
+**React pattern:** When passing state as prop that changes after initial render, sync with useEffect:
+
+```typescript
+// ChatPanel - syncs parent's conversationId prop with internal state
+useEffect(() => {
+  if (initialConversationId !== undefined && initialConversationId !== conversationId) {
+    setConversationId(initialConversationId);
+  }
+}, [initialConversationId]);
+```
+
+This prevents components from getting stuck with stale initial prop values.
+
+## Configuration
+
+**Environment Variables (.env):**
+```bash
+# Database
+DATABASE_URL=sqlite:///./data/app_data/sqlite.db
+POSTGRES_URL=postgresql://user:pass@host:port/dbname
+
+# OpenAI
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+RAG_SIMILARITY_THRESHOLD=0.85
+
+# Auth
+SECRET_KEY=change-in-production
+SESSION_EXPIRATION_HOURS=8
+
+# Performance
+POSTGRES_TIMEOUT=30
+OPENAI_MAX_TOKENS=1000
+OPENAI_TEMPERATURE=0.0
+```
+
+**Settings managed via Pydantic:** See `backend/app/config.py`
+
+## Testing Strategy
+
+**Coverage: 89% (179 tests passing)**
 
 ```bash
+# Test categories
+tests/api/           # API endpoint tests (auth, queries, chat, admin)
+tests/services/      # Service layer tests (query, llm, kb, schema, postgres, export)
+```
+
+**Key fixtures (conftest.py):**
+- `test_db` - Isolated test database
+- `test_client` - FastAPI TestClient
+- `authenticated_user` - Pre-authenticated test user
+- `admin_user` - Admin user for protected endpoints
+
+**Mock patterns:**
+```python
+# Mock OpenAI to avoid rate limits and costs
+@pytest.fixture
+def mock_openai(monkeypatch):
+    async def mock_select_tables(*args, **kwargs):
+        return ["table1", "table2"]
+
+    async def mock_generate_sql(*args, **kwargs):
+        return "SELECT * FROM table1;"
+
+    monkeypatch.setattr(LLMService, "select_relevant_tables", mock_select_tables)
+    monkeypatch.setattr(LLMService, "generate_sql", mock_generate_sql)
+```
+
+## Database Migrations
+
+**Creating migrations:**
+```bash
+# Create new migration
+python scripts/create_migration.py "Add new column to users"
+# Creates: migrations/008_add_new_column_to_users.sql
+
 # Run migrations
 make db-migrate
 
-# Check migration status
+# Check status
 make db-status
-
-# Reset database (WARNING: deletes all data)
-make db-reset
-
-# Open SQLite shell
-make db-shell
-
-# Generate TypeScript types from schema
-make generate-types
 ```
 
-## Architecture
+**Migration format:**
+```sql
+-- migrations/008_example.sql
+-- UP
+ALTER TABLE users ADD COLUMN new_field TEXT;
 
-### Three-Layer Backend Architecture
-
-The backend follows a strict separation of concerns:
-
-1. **API Layer** (`backend/app/api/`)
-   - FastAPI route handlers
-   - Request/response validation via Pydantic schemas
-   - Authentication and authorization enforcement
-   - Minimal business logic - delegates to services
-
-2. **Service Layer** (`backend/app/services/`)
-   - All business logic lives here
-   - Orchestrates complex workflows
-   - Handles external API calls (OpenAI)
-   - Transaction management
-
-3. **Data Layer** (`backend/app/models/`)
-   - SQLAlchemy ORM models
-   - Database schema definitions
-   - Relationships and constraints
-
-**Critical:** Never put business logic in API handlers. Always delegate to service layer.
-
-### Two-Stage SQL Generation Process
-
-The core SQL generation workflow is implemented in `backend/app/services/query_service.py` and `backend/app/services/llm_service.py`:
-
-**Stage 1: Schema Optimization** (`LLMService.select_relevant_tables()`)
-- Problem: PostgreSQL schema has 279 tables - too large for LLM context
-- Solution: Use LLM to select only relevant tables (max 10) based on question
-- Input: All table names + user question
-- Output: List of 5-10 relevant table names
-- Implementation: `backend/app/services/llm_service.py:39-106`
-
-**Stage 2: SQL Generation** (`LLMService.generate_sql()`)
-- Use filtered schema from Stage 1
-- Load similar SQL examples from knowledge base (top 3)
-- Generate SQL with full context (schema + examples)
-- Validate SQL (SELECT-only, no DDL/DML)
-- Implementation: `backend/app/services/llm_service.py:151-214`
-
-**Complete Workflow:**
-```
-User submits question
-  → QueryService.create_query_attempt()
-  → SchemaService.get_table_names()
-  → LLMService.select_relevant_tables() [Stage 1]
-  → SchemaService.filter_schema_by_tables()
-  → KnowledgeBaseService.find_similar_examples()
-  → LLMService.generate_sql() [Stage 2]
-  → Validate SQL
-  → Store in database
-  → Return to user
+-- DOWN
+ALTER TABLE users DROP COLUMN new_field;
 ```
 
-### Query Execution Flow
+## Admin Endpoints
 
-Implemented in `backend/app/services/postgres_execution_service.py`:
+```bash
+# Refresh schema cache (reload from PostgreSQL)
+POST /api/admin/schema/refresh
 
-```
-User requests execution
-  → PostgresExecutionService.execute_query()
-  → Validate query (must be generated, not executed, SELECT-only)
-  → Execute with 30-second timeout
-  → Store results in QueryResultsManifest (JSON)
-  → Paginate results (500 rows per page)
-  → Return first page
-```
+# Reload knowledge base examples
+POST /api/admin/knowledge-base/refresh
 
-**Important:** Results are stored in `QueryResultsManifest` model as JSON, not in separate tables. This allows efficient pagination without re-querying PostgreSQL.
-
-### Database Architecture
-
-**Two Databases:**
-1. **SQLite** (`sqlite.db`) - Application data
-   - Users, sessions (JWT auth)
-   - Query attempts and results
-   - Managed via migrations in `migrations/`
-
-2. **PostgreSQL** (configured via `POSTGRES_URL`) - Target database
-   - User's data to query
-   - Read-only SELECT queries
-   - Schema cached in `data/schema/` JSON files
-
-### Authentication Flow
-
-Implemented in `backend/app/services/auth_service.py`:
-
-1. Login: POST `/api/auth/login` with username/password
-2. Verify password with bcrypt
-3. Create Session record with JWT token
-4. Return token + user info
-5. Frontend stores token and adds to Authorization header
-6. `get_current_user` dependency validates token on protected routes
-7. Logout: POST `/api/auth/logout` revokes session
-
-**Session Management:**
-- JWT tokens stored in Session table
-- Configurable expiration (default 8 hours)
-- Token revocation on logout
-- Role-based access: admin sees all queries, users see only their own
-
-### Knowledge Base System
-
-Located in `data/knowledge_base/*.sql`:
-
-- SQL examples for RAG-based generation
-- Used in Stage 2 to provide context
-- Currently: Simple keyword matching (TODO: embeddings)
-- Service: `backend/app/services/knowledge_base_service.py`
-
-When adding new example queries:
-1. Create `.sql` file in `data/knowledge_base/`
-2. Use descriptive filename (becomes query description)
-3. Write clean, well-formatted SQL
-4. Restart backend to reload examples
-
-## Frontend Architecture
-
-### Component Structure
-
-- **Views** (`frontend/src/views/`) - Page-level components with routing
-  - `QueryInterfaceView/` - Main SQL generation and execution interface
-  - `QueryHistoryView/` - Historical query list with filtering
-  - `LoginView/` - Authentication
-
-- **Components** (`frontend/src/components/`) - Reusable UI components
-  - Button, TextArea, Toast, Pagination, etc.
-  - Each component in own directory with index.tsx
-
-- **Services** (`frontend/src/services/`) - API client layer
-  - `apiClient.ts` - Axios instance with auth interceptors
-  - `authService.ts`, `queryService.ts`, `adminService.ts`
-  - All API calls go through services, never direct fetch/axios in components
-
-- **Types** (`frontend/src/types/`) - TypeScript definitions
-  - Generated from backend schemas via `make generate-types`
-  - Keep in sync with backend Pydantic models
-
-### API Integration
-
-All API communication uses the centralized `apiClient` (Axios instance):
-
-```typescript
-// frontend/src/services/apiClient.ts exports configured axios
-// - Automatically adds Authorization header from AuthContext
-// - Handles 401 errors (redirects to login)
-// - Base URL: http://localhost:8000 or /api (proxied)
+# Generate embeddings for KB examples
+POST /api/admin/knowledge-base/embeddings/generate
 ```
 
-**Pattern:**
-1. AuthContext provides authentication state
-2. ProtectedRoute wraps authenticated views
-3. Services use apiClient for all API calls
-4. apiClient interceptor adds auth token
-5. On 401, clear auth and redirect to login
-
-## Testing
-
-### Test Organization
-
-```
-tests/
-├── api/              # API endpoint tests (FastAPI TestClient)
-│   ├── test_auth.py  # Login, logout, session validation
-│   └── test_queries.py  # Query CRUD, execution, export
-└── services/         # Service layer unit tests
-    ├── test_query_service.py
-    ├── test_llm_service.py
-    ├── test_knowledge_base_service.py
-    └── ...
-```
-
-### Testing Patterns
-
-**Use fixtures from `conftest.py`:**
-- `db_session` - Clean database for each test
-- `test_user` - Pre-created test user
-- `admin_user` - Pre-created admin user
-- `auth_headers_user` - Authorization headers for test user
-- `mock_llm_service` - Mocked LLM for fast tests
-
-**API Testing:**
-```python
-from fastapi.testclient import TestClient
-from backend.app.main import app
-
-client = TestClient(app)
-response = client.post("/api/auth/login", json={"username": "...", "password": "..."})
-assert response.status_code == 200
-```
-
-**Service Testing:**
-```python
-@pytest.mark.asyncio
-async def test_generate_sql(mock_llm_service):
-    result = await mock_llm_service.generate_sql(...)
-    assert result.startswith("SELECT")
-```
-
-### Key Test Coverage Areas
-
-- Authentication flow (login, logout, token validation)
-- Two-stage SQL generation (table selection + SQL generation)
-- Query execution with timeout and validation
-- CSV export with row limits (10,000 max)
-- Knowledge base loading and example retrieval
-- Role-based access control (admin vs user)
-
-## Environment Configuration
-
-Copy `.env.example` to `.env` and configure:
-
-**Required:**
-- `OPENAI_API_KEY` - Get from https://platform.openai.com/api-keys
-- `POSTGRES_URL` - Target database for queries (postgresql://...)
-
-**Optional but Important:**
-- `SECRET_KEY` - Change in production (use `openssl rand -hex 32`)
-- `SESSION_EXPIRATION_HOURS` - Default 8 hours
-- `OPENAI_MODEL` - Default gpt-4 (can use gpt-3.5-turbo for cost)
-- `DATABASE_ECHO` - Set `true` to log all SQL queries
-
-## Code Style and Patterns
-
-### Backend (Python)
-
-- Use type hints everywhere
-- Async/await for I/O operations (OpenAI, database)
-- Pydantic for all DTOs and validation
-- Dependency injection via FastAPI dependencies
-- Comprehensive logging with structured extra fields
-- Exception handling: Raise HTTPException in API layer, custom exceptions in services
-
-### Frontend (TypeScript)
-
-- Functional components with hooks
-- CSS Modules for styling (`.module.css`)
-- No inline styles except for dynamic values
-- Props interfaces defined in component file or separate `types.ts`
-- Custom hooks in `hooks/` directory
-- Error boundaries for graceful failure
+All admin endpoints require admin role authentication.
 
 ## Common Workflows
 
 ### Adding a New API Endpoint
 
 1. Define Pydantic schemas in `backend/app/schemas/`
-2. Implement business logic in `backend/app/services/`
-3. Create route handler in `backend/app/api/`
-4. Register router in `backend/app/main.py`
-5. Write tests in `tests/api/`
-6. Update frontend types: `make generate-types`
-7. Create service function in `frontend/src/services/`
-8. Use in component
+2. Create route handler in `backend/app/api/`
+3. Implement business logic in `backend/app/services/`
+4. Add tests in `tests/api/` and `tests/services/`
+5. Run `make generate-types` to update TypeScript types
+6. Implement frontend service method in `frontend/src/services/`
+7. Update UI components as needed
 
-### Adding a Database Migration
+### Adding New Knowledge Base Examples
 
-1. Create migration file: `touch migrations/YYYYMMDDHHMMSS_description.sql`
-2. Write SQL (CREATE TABLE, ALTER TABLE, etc.)
-3. Run migration: `make db-migrate`
-4. Update SQLAlchemy models in `backend/app/models/`
-5. Generate TypeScript types: `make generate-types`
+1. Create `.sql` file in `data/knowledge_base/`
+2. Format: `-- Title: <title>\n-- Description: <desc>\n<SQL>`
+3. Generate embeddings: `POST /api/admin/knowledge-base/embeddings/generate`
+4. Restart backend to load new examples
 
 ### Debugging SQL Generation Issues
 
-1. Check OpenAI API key is valid
-2. Enable SQL logging: `DATABASE_ECHO=true` in `.env`
-3. Look at LLM prompts in logs (INFO level)
-4. Check knowledge base examples loaded correctly
-5. Verify schema snapshot is up to date
-6. Test with simpler questions first
-7. Check token usage in logs (may hit limits)
+**Check logs for:**
+- Stage 1 selected tables (should be 5-10)
+- Stage 2 filtered schema size (check token count)
+- KB similarity scores (>0.85 means direct match)
+- LLM responses and validation errors
 
-## Important Constraints
+**Common issues:**
+- Wrong tables selected → Improve table selection prompt
+- Forbidden keywords detected → Check `_is_dangerous_sql()` logic
+- Timeout → Reduce `POSTGRES_TIMEOUT` or optimize query
+- Rate limit → Implement retry logic or increase quota
 
-- **SQL Safety:** Only SELECT queries allowed - validated in multiple places
-- **Export Limits:** CSV export capped at 10,000 rows
-- **Timeout:** PostgreSQL queries timeout after 30 seconds
-- **Pagination:** Results paginated at 500 rows per page
-- **Table Selection:** Max 10 tables selected in Stage 1
-- **KB Examples:** Top 3 examples used in Stage 2
+## Architecture Decision Records
 
-## API Documentation
+**Why two-stage SQL generation?**
+- Token limits: 279 tables exceed GPT-4 context window
+- Solution: Stage 1 selects relevant tables, Stage 2 generates SQL with focused schema
 
-When backend is running:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+**Why SQLite + PostgreSQL dual databases?**
+- PostgreSQL: Target database for user queries (read-only)
+- SQLite: Simpler for app data (users, sessions, history)
+- Separation of concerns: App logic vs. user data
 
-## Troubleshooting
+**Why persist embeddings in JSON?**
+- Avoid OpenAI API costs on every server restart
+- Fast startup: Load pre-computed embeddings
+- Manual refresh when KB changes
 
-**"OpenAI API key not configured"**
-- Add `OPENAI_API_KEY=sk-...` to `.env`
-
-**"LLM did not return valid table names"**
-- Stage 1 failed - LLM response format unexpected
-- Check logs for raw LLM response
-- Simplify question or add more context
-
-**"Query execution failed: timeout"**
-- Query took >30 seconds
-- Optimize query or increase `POSTGRES_TIMEOUT`
-
-**Frontend can't reach API**
-- Verify backend running on port 8000
-- Check CORS settings in `backend/app/main.py`
-- Verify proxy config in `frontend/vite.config.ts`
-
-**Tests failing with database errors**
-- Run `make db-init` to reset test database
-- Check migrations are up to date: `make db-status`
+**Why conversation history in LLM calls?**
+- Context-aware refinements: "add WHERE clause", "show only top 10"
+- Natural conversation flow without repeating full question
+- Enables iterative query development
