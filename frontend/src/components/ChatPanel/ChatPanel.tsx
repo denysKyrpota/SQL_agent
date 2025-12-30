@@ -38,6 +38,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Sync internal conversationId with prop
+  useEffect(() => {
+    if (initialConversationId !== undefined && initialConversationId !== conversationId) {
+      setConversationId(initialConversationId);
+    }
+  }, [initialConversationId]);
+
   // Load conversation messages
   useEffect(() => {
     if (conversationId) {
