@@ -257,7 +257,8 @@ class ChatService:
 
             # Stage 2: Generate SQL with context
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
-            similar_examples = self.kb.find_similar_examples(request.content, top_k=3)
+            similar_kb_examples, _ = await self.kb.find_similar_examples(request.content, top_k=3)
+            similar_examples = [ex.sql for ex in similar_kb_examples]
 
             generated_sql = await self.llm.generate_sql(
                 question=request.content,
@@ -394,7 +395,8 @@ class ChatService:
             )
 
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
-            similar_examples = self.kb.find_similar_examples(user_messages.content, top_k=3)
+            similar_kb_examples, _ = await self.kb.find_similar_examples(user_messages.content, top_k=3)
+            similar_examples = [ex.sql for ex in similar_kb_examples]
 
             generated_sql = await self.llm.generate_sql(
                 question=user_messages.content,
