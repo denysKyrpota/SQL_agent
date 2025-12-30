@@ -16,14 +16,13 @@ import ResultsSection from './components/ResultsSection';
 import ExampleQuestions from './components/QueryForm/ExampleQuestions';
 import Toast from '@/components/Toast';
 import ChatPanel from '@/components/ChatPanel';
-import Button from '@/components/Button';
 import {
-  createQuery,
   executeQuery,
   getQueryResults,
   exportQueryCSV,
   getExampleQuestions,
 } from '@/services/queryService';
+import chatService from '@/services/chatService';
 import { isAPIError } from '@/types/api';
 import { getErrorMessage } from './utils/errorMessages';
 import styles from './QueryInterfaceView.module.css';
@@ -92,7 +91,7 @@ const QueryInterfaceView: React.FC = () => {
     sessionStorage.setItem('queryInputText', value);
   };
 
-  // Handle query submission
+  // Handle query submission - Now uses chat service
   const handleSubmit = async () => {
     // Enable chat mode when user submits first query
     if (!chatOpen) {
@@ -111,48 +110,27 @@ const QueryInterfaceView: React.FC = () => {
     }));
 
     try {
-      // Stage 1: Schema analysis (simulated, happens on backend)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Send message through chat service (creates conversation if needed)
+      const response = await chatService.sendMessage({
+        content: queryState.naturalLanguageQuery,
+        conversation_id: conversationId,
+      });
 
-      setQueryState(prev => ({ ...prev, loadingStage: 'generation' }));
-
-      // Call API to create query and generate SQL
-      const response = await createQuery(queryState.naturalLanguageQuery);
-
-      // Check if generation was successful
-      if (response.status === 'failed_generation') {
-        setQueryState(prev => ({
-          ...prev,
-          isGenerating: false,
-          loadingStage: null,
-          error: {
-            type: 'generation',
-            message: getErrorMessage('generation'),
-            detail: response.error_message || undefined,
-          },
-        }));
-        return;
+      // Update conversation ID if this is first message
+      if (!conversationId) {
+        setConversationId(response.conversation_id);
       }
 
-      // Success - SQL generated
+      // Clear input and saved state
       setQueryState(prev => ({
         ...prev,
+        naturalLanguageQuery: '',
         isGenerating: false,
         loadingStage: null,
-        queryId: response.id,
-        generatedSql: response.generated_sql,
-        status: response.status,
-        generationTimeMs: response.generation_ms,
       }));
-
-      // Clear saved input on success
       sessionStorage.removeItem('queryInputText');
 
-      // Auto-scroll to SQL preview
-      setTimeout(() => {
-        const sqlSection = document.querySelector('.sql-preview-section');
-        sqlSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+      // The ChatPanel will automatically reload and show the new messages
 
     } catch (error) {
       console.error('Query submission error:', error);

@@ -246,7 +246,7 @@ class ChatService:
 
             selected_tables = await self.llm.select_relevant_tables(
                 question=request.content,
-                all_table_names=all_tables,
+                table_names=all_tables,
                 conversation_history=context_messages,
             )
 
@@ -389,7 +389,7 @@ class ChatService:
             all_tables = self.schema.get_table_names()
             selected_tables = await self.llm.select_relevant_tables(
                 question=user_messages.content,
-                all_table_names=all_tables,
+                table_names=all_tables,
                 conversation_history=context_messages,
             )
 
