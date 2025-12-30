@@ -10,7 +10,6 @@ import type { QueryFormProps } from '../../types';
 import TextArea from '@/components/TextArea';
 import Button from '@/components/Button';
 import CharacterCount from './CharacterCount';
-import ExampleQuestions from './ExampleQuestions';
 import { validateQuery } from '../../utils/validation';
 import styles from './QueryForm.module.css';
 
@@ -21,7 +20,6 @@ const QueryForm: React.FC<QueryFormProps> = ({
   onChange,
   onSubmit,
   disabled,
-  examples,
 }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -45,11 +43,6 @@ const QueryForm: React.FC<QueryFormProps> = ({
     if (validationError) {
       setValidationError(null);
     }
-  };
-
-  const handleExampleSelect = (example: string) => {
-    onChange(example);
-    setValidationError(null);
   };
 
   const isSubmitDisabled = disabled || value.trim().length === 0;
@@ -87,12 +80,6 @@ const QueryForm: React.FC<QueryFormProps> = ({
           </div>
         )}
       </div>
-
-      <ExampleQuestions
-        examples={examples}
-        onSelect={handleExampleSelect}
-        disabled={disabled}
-      />
 
       <div className={styles['form-actions']}>
         <Button

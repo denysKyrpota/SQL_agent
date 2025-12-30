@@ -13,6 +13,7 @@ import LoadingIndicator from './components/LoadingIndicator';
 import SqlPreviewSection from './components/SqlPreviewSection';
 import ErrorAlert from './components/ErrorAlert';
 import ResultsSection from './components/ResultsSection';
+import ExampleQuestions from './components/QueryForm/ExampleQuestions';
 import Toast from '@/components/Toast';
 import ChatPanel from '@/components/ChatPanel';
 import Button from '@/components/Button';
@@ -22,9 +23,8 @@ import {
   getQueryResults,
   exportQueryCSV,
   getExampleQuestions,
-  type ExampleQuestion
 } from '@/services/queryService';
-import { APIError, isAPIError } from '@/types/api';
+import { isAPIError } from '@/types/api';
 import { getErrorMessage } from './utils/errorMessages';
 import styles from './QueryInterfaceView.module.css';
 
@@ -94,6 +94,11 @@ const QueryInterfaceView: React.FC = () => {
 
   // Handle query submission
   const handleSubmit = async () => {
+    // Enable chat mode when user submits first query
+    if (!chatOpen) {
+      setChatOpen(true);
+    }
+
     // Clear previous state
     setQueryState(prev => ({
       ...prev,
@@ -372,6 +377,11 @@ const QueryInterfaceView: React.FC = () => {
     }));
   };
 
+  // Handle example question selection
+  const handleExampleSelect = (example: string) => {
+    handleInputChange(example);
+  };
+
   // Handle query execution from chat
   const handleChatQueryExecute = async (queryAttemptId: number) => {
     setQueryState(prev => ({
@@ -462,6 +472,10 @@ const QueryInterfaceView: React.FC = () => {
     }
   };
 
+  // Determine what to show
+  const showExampleQuestions = !chatOpen;
+  const isInitialState = !chatOpen;
+
   return (
     <main className={styles['query-interface']} aria-label="Query Interface">
       {/* Toast Notifications */}
@@ -474,83 +488,100 @@ const QueryInterfaceView: React.FC = () => {
       )}
 
       <div className={styles['query-interface-container']}>
-        <h1>Ask Your Database</h1>
+        {/* Hero Section - Title */}
+        <div className={(styles as any)['hero-section']}>
+          <h1>Ask Your Database</h1>
 
-        {/* Query Form Section */}
-        <div className={styles['query-form']}>
-          <QueryForm
-            value={queryState.naturalLanguageQuery}
-            onChange={handleInputChange}
-            onSubmit={handleSubmit}
-            disabled={queryState.isGenerating || queryState.isExecuting}
-            examples={exampleQuestions}
-          />
+          {/* Query Form - Centered when in initial state */}
+          {isInitialState && (
+            <div className={(styles as any)['centered-form']}>
+              <div className={styles['query-form']}>
+                <QueryForm
+                  value={queryState.naturalLanguageQuery}
+                  onChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  disabled={queryState.isGenerating || queryState.isExecuting}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Chat Toggle Button */}
-        <div className={(styles as any)['chat-toggle-container']}>
-          <Button
-            variant="secondary"
-            onClick={() => setChatOpen(!chatOpen)}
-            className={(styles as any)['chat-toggle-button']}
-          >
-            {chatOpen ? '✕ Close Chat' : '💬 Open Chat (Conversational Mode)'}
-          </Button>
-        </div>
+        {/* Layout Container - Shows when in chat mode */}
+        <div className={(styles as any)['layout-container']}>
+          {/* Main Content (Center) */}
+          <div className={(styles as any)['main-content']}>
+            {/* Chat Mode - Show chat panel and other content */}
+            {chatOpen && (
+              <>
+                {/* Chat Panel */}
+                <div className={(styles as any)['chat-panel-container']}>
+                  <ChatPanel
+                    conversationId={conversationId}
+                    onQueryExecute={handleChatQueryExecute}
+                    onConversationChange={setConversationId}
+                    className={(styles as any)['chat-panel']}
+                  />
+                </div>
 
-        {/* Chat Panel */}
-        {chatOpen && (
-          <div className={(styles as any)['chat-panel-container']}>
-            <ChatPanel
-              conversationId={conversationId}
-              onQueryExecute={handleChatQueryExecute}
-              onConversationChange={setConversationId}
-              className={(styles as any)['chat-panel']}
-            />
+                {/* Loading Indicator */}
+                {queryState.loadingStage && (
+                  <LoadingIndicator stage={queryState.loadingStage} />
+                )}
+
+                {/* Error Alert */}
+                {queryState.error && (
+                  <ErrorAlert
+                    type={queryState.error.type}
+                    message={queryState.error.message}
+                    detail={queryState.error.detail}
+                    dismissible={true}
+                    onDismiss={handleRetry}
+                    action={{
+                      label: 'Try Again',
+                      onClick: handleRetry,
+                    }}
+                  />
+                )}
+
+                {/* SQL Preview Section */}
+                {queryState.generatedSql && !queryState.error && (
+                  <SqlPreviewSection
+                    sql={queryState.generatedSql}
+                    onExecute={handleExecute}
+                    onCopy={handleCopy}
+                    executing={queryState.isExecuting}
+                  />
+                )}
+
+                {/* Results Section */}
+                {queryState.results && queryState.status === 'success' && (
+                  <ResultsSection
+                    results={queryState.results}
+                    currentPage={queryState.currentPage}
+                    onPageChange={handlePageChange}
+                    onExport={handleExport}
+                    generationTimeMs={queryState.generationTimeMs || 0}
+                    executionTimeMs={queryState.executionTimeMs || 0}
+                  />
+                )}
+              </>
+            )}
           </div>
-        )}
 
-        {/* Loading Indicator */}
-        {queryState.loadingStage && (
-          <LoadingIndicator stage={queryState.loadingStage} />
-        )}
-
-        {/* Error Alert */}
-        {queryState.error && (
-          <ErrorAlert
-            type={queryState.error.type}
-            message={queryState.error.message}
-            detail={queryState.error.detail}
-            dismissible={true}
-            onDismiss={handleRetry}
-            action={{
-              label: 'Try Again',
-              onClick: handleRetry,
-            }}
-          />
-        )}
-
-        {/* SQL Preview Section */}
-        {queryState.generatedSql && !queryState.error && (
-          <SqlPreviewSection
-            sql={queryState.generatedSql}
-            onExecute={handleExecute}
-            onCopy={handleCopy}
-            executing={queryState.isExecuting}
-          />
-        )}
-
-        {/* Results Section */}
-        {queryState.results && queryState.status === 'success' && (
-          <ResultsSection
-            results={queryState.results}
-            currentPage={queryState.currentPage}
-            onPageChange={handlePageChange}
-            onExport={handleExport}
-            generationTimeMs={queryState.generationTimeMs || 0}
-            executionTimeMs={queryState.executionTimeMs || 0}
-          />
-        )}
+          {/* Sidebar (Right) - Example Questions */}
+          {showExampleQuestions && (
+            <aside className={(styles as any)['sidebar']}>
+              <div className={(styles as any)['sidebar-panel']}>
+                <ExampleQuestions
+                  examples={exampleQuestions}
+                  onSelect={handleExampleSelect}
+                  disabled={queryState.isGenerating || queryState.isExecuting}
+                />
+              </div>
+            </aside>
+          )}
+        </div>
       </div>
     </main>
   );

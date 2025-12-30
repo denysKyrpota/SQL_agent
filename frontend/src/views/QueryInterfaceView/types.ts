@@ -74,7 +74,6 @@ export interface QueryFormProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled: boolean;
-  examples: string[];
 }
 
 /**
