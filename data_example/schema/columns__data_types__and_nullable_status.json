@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2024-01-01T12:00:00Z",
+  "tables": {
+    "customers": {
+      "columns": [
+        {
+          "column_name": "customer_id",
+          "data_type": "integer",
+          "is_nullable": false,
+          "is_primary_key": true
+        },
+        {
+          "column_name": "name",
+          "data_type": "character varying",
+          "is_nullable": false
+        },
+        {
+          "column_name": "email",
+          "data_type": "character varying",
+          "is_nullable": false
+        },
+        {
+          "column_name": "phone",
+          "data_type": "character varying",
+          "is_nullable": true
+        },
+        {
+          "column_name": "created_at",
+          "data_type": "timestamp without time zone",
+          "is_nullable": false
+        }
+      ]
+    },
+    "orders": {
+      "columns": [
+        {
+          "column_name": "order_id",
+          "data_type": "integer",
+          "is_nullable": false,
+          "is_primary_key": true
+        },
+        {
+          "column_name": "customer_id",
+          "data_type": "integer",
+          "is_nullable": false,
+          "is_foreign_key": true,
+          "references": "customers.customer_id"
+        },
+        {
+          "column_name": "order_date",
+          "data_type": "timestamp without time zone",
+          "is_nullable": false
+        },
+        {
+          "column_name": "total_amount",
+          "data_type": "numeric",
+          "is_nullable": false
+        },
+        {
+          "column_name": "status",
+          "data_type": "character varying",
+          "is_nullable": false
+        }
+      ]
+    },
+    "products": {
+      "columns": [
+        {
+          "column_name": "product_id",
+          "data_type": "integer",
+          "is_nullable": false,
+          "is_primary_key": true
+        },
+        {
+          "column_name": "product_name",
+          "data_type": "character varying",
+          "is_nullable": false
+        },
+        {
+          "column_name": "category",
+          "data_type": "character varying",
+          "is_nullable": true
+        },
+        {
+          "column_name": "price",
+          "data_type": "numeric",
+          "is_nullable": false
+        },
+        {
+          "column_name": "active",
+          "data_type": "boolean",
+          "is_nullable": false,
+          "default": "true"
+        }
+      ]
+    }
+  }
+}

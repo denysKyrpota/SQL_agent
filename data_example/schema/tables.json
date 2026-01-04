@@ -1,0 +1,17 @@
+{
+  "tables": [
+    "customers",
+    "orders",
+    "order_items",
+    "products",
+    "users",
+    "login_history",
+    "categories",
+    "inventory",
+    "shipping_addresses",
+    "payments"
+  ],
+  "generated_at": "2024-01-01T12:00:00Z",
+  "database": "example_database",
+  "total_tables": 10
+}

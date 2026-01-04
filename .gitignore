@@ -45,13 +45,9 @@ data/exports/*
 !data/exports/.gitkeep
 
 # Sensitive Data - DO NOT COMMIT
-# All knowledge base and schema files contain sensitive business/database information
-# Users must generate their own after connecting to their PostgreSQL database
-data/knowledge_base/*.sql
-data/schema/*.json
-
-# Knowledge Base Embeddings (generated, should not be committed)
-data/knowledge_base/embeddings.json
+# The entire data/ folder contains sensitive business/database information
+# Users must create their own data folder (see data_example/ for structure)
+data/
 
 # Environment variables
 .env
@@ -96,7 +92,11 @@ tmp/
 temp/
 
 test_openai_connection.py
-.ai
+
+# AI files
+/.ai/
+/.kilocode/
+/.claude/
 
 # Claude Code custom instructions (local only)
 *.mdc
