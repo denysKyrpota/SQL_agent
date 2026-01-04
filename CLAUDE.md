@@ -258,6 +258,13 @@ OPENAI_MODEL=gpt-4
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 RAG_SIMILARITY_THRESHOLD=0.85
 
+# Azure OpenAI (Optional - if set, will use Azure instead of OpenAI)
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_KEY=your-azure-key
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your-embedding-deployment
+
 # Auth
 SECRET_KEY=change-in-production
 SESSION_EXPIRATION_HOURS=8

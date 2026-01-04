@@ -1,612 +1,488 @@
 # SQL AI Agent
 
-A full-stack application that translates natural language queries into SQL and executes them against a PostgreSQL database. The system uses OpenAI's LLM for intelligent SQL generation with a RAG-based knowledge base for improved accuracy.
+A production-ready text-to-SQL application that converts natural language questions into PostgreSQL queries using GPT-4 and Retrieval-Augmented Generation (RAG).
 
-[![Tests](https://img.shields.io/badge/tests-179%20passing-brightgreen)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)](htmlcov/index.html)
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104%2B-009688)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18.0%2B-61dafb)](https://reactjs.org/)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)
+![React](https://img.shields.io/badge/React-18.2+-61dafb.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)
+![Test Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen.svg)
 
-## 🚀 Features
+## Features
 
-### Core Functionality
-- **Natural Language to SQL**: Convert plain English questions into SQL queries
-- **Two-Stage SQL Generation**:
-  - Stage 1: Table selection from schema
-  - Stage 2: SQL generation with filtered schema + RAG examples
-- **Query Execution**: Execute generated SQL against PostgreSQL with 30s timeout
-- **Result Export**: Export query results to CSV (up to 10,000 rows)
-- **Query History**: Track all queries with status, timing, and error details
+- 🤖 **Intelligent SQL Generation** - Two-stage pipeline for accurate query generation from natural language
+- 💬 **Conversational Interface** - Chat-based UI with context-aware refinements
+- 📚 **RAG System** - Knowledge base with semantic search for improved query quality
+- 🔒 **Secure Authentication** - Session-based auth with role-based access control
+- 📊 **Query History** - Track and re-run previous queries
+- 🎯 **Smart Schema Filtering** - Handles large databases (279+ tables) efficiently
+- 🔄 **Real-time Execution** - Execute generated SQL and view results instantly
+- 📥 **CSV Export** - Export query results with configurable limits
+- ☁️ **Azure OpenAI Support** - Works with both OpenAI and Azure OpenAI
 
-### AI/ML Features
-- **RAG-Based Knowledge Base**: Use similar SQL examples for better generation
-- **Schema Optimization**: Select only relevant tables to reduce token usage
-- **Retry Logic**: Automatic retry with exponential backoff for LLM failures
-- **SQL Validation**: Ensure only SELECT queries, prevent SQL injection
+## Architecture
 
-### Authentication & Security
-- **JWT Authentication**: Secure session management with bcrypt password hashing
-- **Role-Based Access Control**: Admin and user roles
-- **Session Management**: Configurable expiration, token revocation
-- **CORS Protection**: Configured for allowed origins
+**Stack:**
+- **Frontend:** React 18 + TypeScript + Vite
+- **Backend:** FastAPI + Python 3.11+
+- **Databases:**
+  - SQLite (application data: users, sessions, query history)
+  - PostgreSQL (target database for queries - read-only)
+- **AI/ML:** OpenAI GPT-4 or Azure OpenAI
 
-## 🏗️ Tech Stack
-
-### Backend
-- **FastAPI** - Modern Python web framework
-- **SQLAlchemy** - ORM for SQLite (app data) and PostgreSQL (target queries)
-- **OpenAI GPT-4** - LLM for SQL generation
-- **Pydantic** - Data validation and serialization
-- **bcrypt** - Password hashing
-- **JWT** - Session token management
-
-### Frontend
-- **React 18** - UI framework
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool
-- **Axios** - HTTP client with interceptors
-
-### Database
-- **SQLite** - Application data (users, sessions, query history)
-- **PostgreSQL** - Target database for query execution
-
-### Testing
-- **pytest** - Test framework
-- **pytest-cov** - Coverage reporting
-- **pytest-asyncio** - Async test support
-- **FastAPI TestClient** - API testing
-
-## 📁 Project Structure
+**Key Components:**
 
 ```
-agent_sql/
-├── backend/
-│   └── app/
-│       ├── api/              # FastAPI route handlers
-│       │   ├── auth.py       # Login/logout endpoints
-│       │   └── queries.py    # Query CRUD, execution, export
-│       ├── models/           # SQLAlchemy ORM models
-│       │   ├── user.py       # User, Session models
-│       │   └── query.py      # QueryAttempt, QueryResultsManifest
-│       ├── schemas/          # Pydantic DTOs
-│       │   ├── auth.py       # Login request/response
-│       │   ├── queries.py    # Query request/response
-│       │   └── common.py     # Shared schemas
-│       ├── services/         # Business logic layer
-│       │   ├── auth_service.py              # Authentication
-│       │   ├── query_service.py             # SQL generation workflow
-│       │   ├── llm_service.py               # OpenAI integration
-│       │   ├── knowledge_base_service.py    # RAG example loading
-│       │   ├── schema_service.py            # PostgreSQL schema
-│       │   ├── postgres_execution_service.py # Query execution
-│       │   └── export_service.py            # CSV export
-│       ├── config.py         # Pydantic settings
-│       ├── database.py       # SQLAlchemy setup
-│       ├── dependencies.py   # FastAPI dependencies
-│       └── main.py          # App initialization
-├── frontend/
-│   └── src/
-│       ├── views/           # Page-level components
-│       ├── components/      # Reusable UI components
-│       ├── services/        # API client layer
-│       ├── hooks/           # Custom React hooks
-│       └── types/           # TypeScript type definitions
-├── tests/
-│   ├── api/                 # API endpoint tests
-│   ├── services/            # Service layer tests
-│   └── conftest.py          # Pytest fixtures
-├── migrations/              # SQL migrations
-├── scripts/                 # Utility scripts
-├── data/
-│   ├── knowledge_base/      # SQL example files
-│   └── schema/              # PostgreSQL schema snapshots
-└── .env                     # Environment configuration
+┌─────────────────┐
+│  React Frontend │
+│   (TypeScript)  │
+└────────┬────────┘
+         │ HTTP/REST
+┌────────▼────────┐
+│  FastAPI Backend│
+│    (Python)     │
+├─────────────────┤
+│  Two-Stage SQL  │
+│   Generation    │
+│  ┌───────────┐  │
+│  │  Stage 1  │  │  Select relevant tables (5-10 from 279)
+│  │  Table    │  │
+│  │ Selection │  │
+│  └─────┬─────┘  │
+│        │        │
+│  ┌─────▼─────┐  │
+│  │  Stage 2  │  │  Generate SQL with filtered schema
+│  │    SQL    │  │  + RAG examples
+│  │ Generation│  │
+│  └───────────┘  │
+└────────┬────────┘
+         │
+    ┌────▼─────┐
+    │PostgreSQL│ (Read-only)
+    └──────────┘
 ```
 
-## ⚙️ Setup
+## Prerequisites
 
-### Prerequisites
-- Python 3.9+
-- Node.js 16+
-- PostgreSQL 12+ (target database)
-- OpenAI API key
+- **Python 3.11+**
+- **Node.js 18+** and npm
+- **PostgreSQL** (your target database)
+- **OpenAI API key** or **Azure OpenAI** credentials
 
-### Backend Setup
+## Quick Start
 
-1. **Clone the repository**
+### 1. Clone the Repository
+
 ```bash
-git clone <repository-url>
-cd agent_sql
+git clone https://github.com/denysKyrpota/SQL_agent.git
+cd SQL_agent
 ```
 
-2. **Create virtual environment**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+### 2. Backend Setup
 
-3. **Install dependencies**
 ```bash
+# Install Python dependencies
 pip install -r requirements.txt
-```
 
-4. **Configure environment**
-```bash
+# Copy environment template
 cp .env.example .env
-# Edit .env with your configuration
-```
 
-Required environment variables:
-```bash
-DATABASE_URL=sqlite:///./sqlite.db
-POSTGRES_URL=postgresql://user:pass@host:port/dbname
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4
-SECRET_KEY=your-secret-key-change-in-production
-SESSION_EXPIRATION_HOURS=8
-```
+# Edit .env with your credentials
+# Required: DATABASE_URL, POSTGRES_URL, OPENAI_API_KEY or Azure credentials
 
-5. **Initialize database**
-```bash
+# Initialize database
 make db-init
-# or
-python scripts/init_db.py
 ```
 
-This creates default users:
-- Admin: `admin` / `admin123`
-- User: `testuser` / `testpass123`
+### 3. Frontend Setup
 
-6. **Start backend server**
-```bash
-python -m backend.app.main
-# or
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-API docs available at:
-- Swagger: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-### Frontend Setup
-
-1. **Navigate to frontend directory**
 ```bash
 cd frontend
-```
 
-2. **Install dependencies**
-```bash
+# Install dependencies
 npm install
-```
 
-3. **Start development server**
-```bash
+# Start development server
 npm run dev
 ```
 
-Frontend available at: http://localhost:5173
+### 4. Start Backend Server
 
-## 📊 Setting Up Your Data
-
-**This repository does NOT include sample data to protect database structure privacy.**
-
-You must connect to your own PostgreSQL database and generate your own schema and knowledge base files.
-
-### Initial Setup
-
-1. **Configure Your PostgreSQL Connection:**
-   ```bash
-   # Edit .env file
-   POSTGRES_URL=postgresql://user:password@host:port/dbname
-   ```
-
-2. **Start the Backend:**
-   ```bash
-   python -m backend.app.main
-   ```
-
-3. **Login as Admin:**
-   ```bash
-   # Get admin token
-   curl -X POST http://localhost:8000/api/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username":"admin","password":"admin123"}'
-
-   # Save the token from response
-   ```
-
-4. **Generate Schema Snapshot:**
-   ```bash
-   # This reads your PostgreSQL schema and creates JSON files in data/schema/
-   curl -X POST http://localhost:8000/api/admin/schema/refresh \
-     -H "Authorization: Bearer <your_admin_token>"
-   ```
-
-### Knowledge Base Setup
-
-The knowledge base contains example SQL queries that help the AI generate better queries through RAG (Retrieval-Augmented Generation).
-
-1. **Create Knowledge Base Examples:**
-
-   Create `.sql` files in `data/knowledge_base/` with this format:
-   ```sql
-   -- Title of the query
-   -- Description: What this query does
-
-   SELECT
-       column1,
-       column2
-   FROM
-       your_table
-   WHERE
-       condition;
-   ```
-
-2. **Generate Embeddings:**
-   ```bash
-   # This creates embeddings for similarity search
-   curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
-     -H "Authorization: Bearer <your_admin_token>"
-   ```
-
-### What Files Are Generated
-
-After setup, these directories will contain your data (all gitignored):
-
-- `data/schema/*.json` - PostgreSQL schema snapshots (5 files)
-- `data/knowledge_base/*.sql` - Your SQL examples
-- `data/knowledge_base/embeddings.json` - Vector embeddings (auto-generated)
-
-**Security Note:** All data files are automatically excluded from Git via `.gitignore` to protect your database structure and business logic.
-
-## 🧪 Testing
-
-### Run All Tests
 ```bash
-make test
-# or
-pytest tests/ -v
+# From project root
+python -m backend.app.main
+
+# Or with auto-reload
+uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Run with Coverage
+### 5. Access the Application
+
+- **Frontend:** http://localhost:5173
+- **API Docs:** http://localhost:8000/docs
+- **Default Login:** `admin` / `admin123`
+
+## Configuration
+
+Create a `.env` file in the project root:
+
 ```bash
-pytest tests/ --cov=backend/app --cov-report=html
-# View report: open htmlcov/index.html
+# Database Configuration
+DATABASE_URL=sqlite:///./data/app_data/sqlite.db
+POSTGRES_URL=postgresql://user:password@localhost:5432/your_database
+
+# OpenAI Configuration (Standard)
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_TEMPERATURE=0.0
+
+# OR Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_KEY=your-azure-key
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+
+# Authentication
+SECRET_KEY=your-secret-key-here-change-in-production
+SESSION_EXPIRATION_HOURS=8
+
+# RAG Settings
+RAG_SIMILARITY_THRESHOLD=0.85
+
+# Performance
+POSTGRES_TIMEOUT=30
+OPENAI_MAX_TOKENS=1000
 ```
 
-### Run Specific Tests
+## Data Setup
+
+### Create Your Data Folder
+
+The `data/` folder contains sensitive information and is not in version control. Use the example structure:
+
 ```bash
-# API tests only
-pytest tests/api/ -v
+# Copy example structure
+cp -r data_example data
 
-# Service tests only
-pytest tests/services/ -v
-
-# Single test file
-pytest tests/api/test_auth.py -v
-
-# Single test
-pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v
+# Add your SQL examples to data/knowledge_base/
+# Each file should contain one SQL query with title/description
 ```
 
-### Test Coverage
-Current coverage: **89%**
+### Knowledge Base Format
 
-Key areas tested:
-- ✅ Authentication (login, logout, sessions)
-- ✅ Query generation (two-stage SQL generation)
-- ✅ Query execution and result handling
-- ✅ CSV export with size limits
-- ✅ LLM service (prompt building, response parsing)
-- ✅ Knowledge base loading
-- ✅ Schema service
-- ✅ Authorization and role-based access
+Create `.sql` files in `data/knowledge_base/`:
 
-## 📚 API Documentation
+```sql
+-- Title: Get active users from last 30 days
+-- Description: Retrieve users who logged in within the past month
 
-### Authentication
-
-#### POST /api/auth/login
-Login with username and password.
-
-**Request:**
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
+SELECT
+    user_id,
+    username,
+    email,
+    last_login
+FROM users
+WHERE
+    last_login >= CURRENT_DATE - INTERVAL '30 days'
+    AND status = 'active'
+ORDER BY last_login DESC;
 ```
 
-**Response:**
-```json
-{
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "role": "admin",
-    "active": true
-  },
-  "session": {
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "expires_at": "2025-11-12T03:00:00Z"
-  }
-}
+### Generate Embeddings
+
+After adding knowledge base examples:
+
+```bash
+# Start the server, then:
+curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
+  -H "Authorization: Bearer <admin_token>"
 ```
 
-#### POST /api/auth/logout
-Logout and revoke session.
+## Usage
 
-**Headers:**
+### 1. Login
+
+Access http://localhost:5173 and login with your credentials.
+
+### 2. Ask Questions in Natural Language
+
 ```
-Authorization: Bearer <token>
-```
-
-### Queries
-
-#### POST /api/queries
-Submit natural language query and generate SQL.
-
-**Request:**
-```json
-{
-  "natural_language_query": "Show me all active users from the last 30 days"
-}
+"Show me all active users from the last 30 days"
+"What are the top 10 products by revenue this year?"
+"List customers who made purchases over $1000"
 ```
 
-**Response:**
-```json
-{
-  "id": 42,
-  "natural_language_query": "Show me all active users from the last 30 days",
-  "generated_sql": "SELECT * FROM users WHERE active = true AND created_at >= NOW() - INTERVAL '30 days';",
-  "status": "not_executed",
-  "created_at": "2025-11-11T20:00:00Z",
-  "generated_at": "2025-11-11T20:00:02Z",
-  "generation_ms": 2150,
-  "error_message": null
-}
+### 3. Review Generated SQL
+
+The system will:
+1. Select relevant tables from your schema
+2. Find similar examples from knowledge base
+3. Generate optimized SQL query
+4. Display the query for review
+
+### 4. Execute and View Results
+
+- Click "Execute" to run the query
+- View paginated results (500 rows per page)
+- Export to CSV (up to 10,000 rows)
+
+### 5. Refine in Chat
+
+Continue the conversation:
+```
+"Add a WHERE clause for active users only"
+"Sort by date descending"
+"Show only top 10 results"
 ```
 
-#### POST /api/queries/{id}/execute
-Execute generated SQL against PostgreSQL.
-
-**Response:**
-```json
-{
-  "id": 42,
-  "status": "success",
-  "executed_at": "2025-11-11T20:00:05Z",
-  "execution_ms": 150,
-  "results": {
-    "total_rows": 523,
-    "page_size": 500,
-    "page_count": 2,
-    "columns": ["id", "username", "email", "created_at"],
-    "rows": [[1, "alice", "alice@example.com", "2025-10-15"], ...]
-  }
-}
-```
-
-#### GET /api/queries/{id}/results?page=1
-Get paginated results (500 rows per page).
-
-#### GET /api/queries/{id}/export
-Export results as CSV (max 10,000 rows).
-
-#### GET /api/queries
-List user's query history with pagination.
-
-**Query Parameters:**
-- `page` (default: 1)
-- `page_size` (default: 20, max: 100)
-- `status_filter` (optional: "success", "failed_generation", etc.)
-
-#### POST /api/queries/{id}/rerun
-Re-run historical query with fresh SQL generation.
-
-## 🔧 Development
+## Development
 
 ### Database Management
 
 ```bash
-# Initialize database with default users
-make db-init
-
-# Initialize without default users
-make db-init-clean
-
-# Reset database (WARNING: deletes all data)
-make db-reset
-
-# Run migrations
-make db-migrate
-
-# Check migration status
-make db-status
-
-# Preview migrations (dry run)
-make db-dry-run
-
-# Open SQLite shell
-make db-shell
-
-# Generate TypeScript types from schema
-make generate-types
+make db-init          # Initialize with default users
+make db-init-clean    # Initialize without default users
+make db-reset         # Reset database (deletes all data)
+make db-migrate       # Run pending migrations
+make db-status        # Show migration status
+make db-shell         # Open SQLite shell
 ```
 
-### Adding a Migration
+### Type Generation
 
-1. Create migration file:
+After modifying Pydantic schemas:
+
 ```bash
-touch migrations/20251111120000_add_user_preferences.sql
+make generate-types   # Generate TypeScript types
 ```
 
-2. Write SQL:
-```sql
--- migrations/20251111120000_add_user_preferences.sql
-CREATE TABLE IF NOT EXISTS user_preferences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    theme VARCHAR(20) DEFAULT 'light',
-    FOREIGN KEY (user_id) REFERENCES users (id)
-);
-```
+### Testing
 
-3. Run migration:
 ```bash
-make db-migrate
+# Run all tests
+make test
+
+# Run with coverage
+pytest tests/ --cov=backend/app --cov-report=html
+
+# Run specific test
+pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v
 ```
+
+**Test Coverage:** 89% (179 tests)
 
 ### Code Quality
 
 ```bash
 # Format code
 black backend/
-isort backend/
 
 # Lint
 flake8 backend/
-pylint backend/
 
-# Type checking
+# Type check
 mypy backend/
-
-# Clean Python cache
-make clean
 ```
 
-## 📊 Architecture
-
-### Three-Layer Architecture
-
-1. **API Layer** (`backend/app/api/`)
-   - FastAPI route handlers
-   - Request validation (Pydantic)
-   - Response serialization
-   - Error handling
-
-2. **Service Layer** (`backend/app/services/`)
-   - Business logic
-   - External API calls (OpenAI)
-   - Complex workflows
-   - Transaction management
-
-3. **Data Layer** (`backend/app/models/`)
-   - SQLAlchemy ORM models
-   - Database schema
-   - Relationships
-
-### SQL Generation Workflow
+## Project Structure
 
 ```
-1. User submits natural language query
-   ↓
-2. QueryService retrieves schema snapshot
-   ↓
-3. LLMService Stage 1: Select relevant tables (max 10)
-   ↓
-4. Filter schema to selected tables only
-   ↓
-5. KnowledgeBaseService finds similar SQL examples (top 3)
-   ↓
-6. LLMService Stage 2: Generate SQL with context
-   ↓
-7. Validate SQL (SELECT-only, no DDL/DML)
-   ↓
-8. Return generated SQL to user
+SQL_agent/
+├── backend/
+│   └── app/
+│       ├── api/              # API route handlers
+│       ├── models/           # SQLAlchemy models
+│       ├── schemas/          # Pydantic schemas
+│       ├── services/         # Business logic
+│       └── main.py           # FastAPI app
+├── frontend/
+│   └── src/
+│       ├── components/       # React components
+│       ├── views/            # Page-level views
+│       ├── services/         # API clients
+│       └── types/            # TypeScript types
+├── data/                     # Your data (not in git)
+│   ├── knowledge_base/       # SQL examples + embeddings
+│   ├── schema/               # PostgreSQL schema cache
+│   └── app_data/             # SQLite database
+├── data_example/             # Example data structure
+├── migrations/               # SQL migration files
+├── tests/                    # Test suite
+└── scripts/                  # Utility scripts
 ```
 
-### Query Execution Flow
+See [project_structure.md](project_structure.md) for detailed structure.
 
+## How It Works
+
+### Two-Stage SQL Generation
+
+**Stage 1: Table Selection**
+- Input: All table names + user question
+- LLM selects 5-10 most relevant tables
+- Reduces context size for efficient processing
+
+**Stage 2: SQL Generation**
+- Input: Filtered schema + question + RAG examples
+- Finds top-3 similar queries from knowledge base
+- Generates optimized PostgreSQL query
+- If similarity > 0.85, returns KB example directly
+
+### RAG System
+
+1. User question → embedding (1536-dim vector)
+2. Cosine similarity search against knowledge base
+3. Top-3 most similar examples added to context
+4. LLM uses examples to generate accurate SQL
+
+### Chat Context
+
+- Maintains full conversation history
+- LLM receives previous Q&A for context
+- Enables refinements: "add WHERE", "top 10", etc.
+- Supports editing (creates branches) and regeneration
+
+## API Documentation
+
+Interactive API documentation available at:
+
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
+
+### Key Endpoints
+
+```bash
+# Authentication
+POST   /api/auth/login
+POST   /api/auth/logout
+GET    /api/auth/me
+
+# Queries
+POST   /api/queries              # Create query attempt
+POST   /api/queries/{id}/execute # Execute query
+GET    /api/queries/{id}         # Get query details
+GET    /api/queries              # List query history
+
+# Chat
+POST   /api/chat/messages        # Send chat message
+GET    /api/conversations/{id}   # Get conversation
+
+# Admin
+POST   /api/admin/schema/refresh
+POST   /api/admin/knowledge-base/refresh
+POST   /api/admin/knowledge-base/embeddings/generate
 ```
-1. User requests execution of generated SQL
-   ↓
-2. PostgresExecutionService validates query
-   ↓
-3. Execute with 30-second timeout
-   ↓
-4. Store results in QueryResultsManifest
-   ↓
-5. Paginate results (500 rows per page)
-   ↓
-6. Return first page to user
+
+## Deployment
+
+### Environment Variables
+
+Ensure all production credentials are set:
+- Change `SECRET_KEY` to a secure random value
+- Use production database URLs
+- Set appropriate CORS origins
+- Configure session expiration
+
+### Database
+
+```bash
+# Run migrations
+make db-migrate
+
+# Create admin user (if not using db-init)
+python scripts/init_db.py --no-defaults
 ```
 
-## 🔐 Security
+### Frontend Build
 
-- **Password Hashing**: bcrypt with automatic salt generation
-- **JWT Tokens**: Stateless authentication with expiration
-- **SQL Injection Prevention**: Parameterized queries, SELECT-only validation
-- **CORS**: Configured for specific origins
-- **Session Revocation**: Logout invalidates tokens
-- **Role-Based Access**: Admin can see all queries, users see only their own
+```bash
+cd frontend
+npm run build
+# Deploy dist/ folder to your hosting service
+```
 
-## 🚧 Roadmap
+## Troubleshooting
 
-- [ ] Frontend implementation completion
-- [ ] Real-time query result streaming
-- [ ] Query result caching
-- [ ] Admin dashboard for metrics
-- [ ] Query sharing and collaboration
-- [ ] SQL query optimization suggestions
-- [ ] Support for multiple PostgreSQL databases
-- [ ] Scheduled queries
-- [ ] Result visualization (charts, graphs)
+### Server Won't Start
 
-## 📝 License
+```bash
+# Check dependencies
+pip list | grep fastapi
 
-This project is licensed under the MIT License.
+# Reinstall
+pip install -r requirements.txt
+```
 
-## 🤝 Contributing
+### Database Errors
 
-Contributions are welcome! Please follow these steps:
+```bash
+# Check migration status
+make db-status
+
+# Reset database (WARNING: deletes all data)
+make db-reset
+make db-init
+```
+
+### OpenAI API Issues
+
+- Verify API key in `.env`
+- Check rate limits and quotas
+- For Azure: ensure endpoint, key, and deployment are correct
+
+### Frontend Build Errors
+
+```bash
+# Clear cache
+rm -rf node_modules package-lock.json
+npm install
+
+# Type check
+npm run type-check
+```
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass (`make test`)
-6. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 🐛 Troubleshooting
+### Development Guidelines
 
-### Backend Issues
+- Follow existing code patterns (see [CLAUDE.md](CLAUDE.md))
+- Add tests for new features
+- Run `make test` before committing
+- Use `black` for Python formatting
+- Update TypeScript types after schema changes
 
-**Database connection error:**
-- Check `POSTGRES_URL` in `.env`
-- Verify PostgreSQL is running
-- Test connection: `psql $POSTGRES_URL`
+## Security
 
-**LLM generation slow:**
-- Check `OPENAI_API_KEY` is valid
-- Monitor OpenAI API status
-- Consider using `gpt-3.5-turbo` for faster responses
+- ⚠️ **Never commit the `data/` folder** - contains sensitive business data
+- ⚠️ **Never commit `.env` file** - contains API keys and secrets
+- ⚠️ Change default passwords in production
+- ⚠️ Use HTTPS in production
+- ⚠️ Review generated SQL before execution (SELECT-only enforced)
 
-**Migration errors:**
-- Check migration history: `make db-status`
-- Reset database: `make db-reset` (WARNING: deletes data)
+## License
 
-### Frontend Issues
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**API connection refused:**
-- Verify backend is running on port 8000
-- Check CORS configuration in `backend/app/main.py`
+## Acknowledgments
 
-**Build errors:**
-- Clear node_modules: `rm -rf node_modules && npm install`
-- Check Node.js version: `node --version` (requires 16+)
+- Built with [FastAPI](https://fastapi.tiangolo.com/)
+- Frontend powered by [React](https://react.dev/) and [Vite](https://vitejs.dev/)
+- AI capabilities by [OpenAI](https://openai.com/)
 
-## 📧 Support
+## Support
 
 For issues and questions:
+- Check [CLAUDE.md](CLAUDE.md) for development guidance
+- Review [TESTING.md](TESTING.md) for testing procedures
 - Open an issue on GitHub
-- Check existing documentation in `CLAUDE.md`
-- Review API docs at http://localhost:8000/docs
 
 ---
 
-Built with ❤️ using FastAPI, React, and OpenAI GPT-4
+**Built with ❤️ for seamless text-to-SQL conversion**
