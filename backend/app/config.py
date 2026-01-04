@@ -46,16 +46,21 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     # =========================================================================
 
-    # OpenAI API key for LLM-powered SQL generation
+    # Choose between standard OpenAI or Azure OpenAI
+    # If azure_openai_endpoint is set, Azure OpenAI will be used
+    # Otherwise, standard OpenAI will be used
+
+    # Standard OpenAI API key
     openai_api_key: str = ""
 
-    # OpenAI model to use for SQL generation
+    # OpenAI model to use for SQL generation (standard OpenAI)
     openai_model: str = "gpt-4"
 
     # Maximum tokens for OpenAI API responses
     openai_max_tokens: int = 1000
 
     # Temperature for OpenAI API (0.0 = deterministic, 1.0 = creative)
+    # Note: Some Azure deployments may not support all temperature values
     openai_temperature: float = 0.0
 
     # OpenAI model for embeddings
@@ -64,6 +69,31 @@ class Settings(BaseSettings):
     # Similarity threshold for RAG (0.0 to 1.0)
     # If similarity is above this threshold, return the example directly
     rag_similarity_threshold: float = 0.85
+
+    # =========================================================================
+    # Azure OpenAI Configuration (Optional)
+    # =========================================================================
+
+    # Azure OpenAI endpoint (e.g., https://your-resource.openai.azure.com)
+    # If set, Azure OpenAI will be used instead of standard OpenAI
+    azure_openai_endpoint: str = ""
+
+    # Azure OpenAI API key
+    azure_openai_api_key: str = ""
+
+    # Azure OpenAI deployment name for chat completions
+    azure_openai_deployment: str = ""
+
+    # Azure OpenAI API version
+    azure_openai_api_version: str = "2024-02-15-preview"
+
+    # Azure OpenAI deployment name for embeddings (optional, uses chat deployment if not set)
+    azure_openai_embedding_deployment: str = ""
+
+    @property
+    def use_azure_openai(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return bool(self.azure_openai_endpoint and self.azure_openai_api_key and self.azure_openai_deployment)
 
     # =========================================================================
     # Authentication Configuration

@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import Any
 
-from openai import AsyncOpenAI, RateLimitError, APIError, APIConnectionError
+from openai import AsyncOpenAI, AsyncAzureOpenAI, RateLimitError, APIError, APIConnectionError
 
 from backend.app.config import get_settings
 
@@ -28,14 +28,33 @@ class LLMService:
     """
 
     def __init__(self):
-        """Initialize the LLM service with OpenAI client."""
-        self.model = settings.openai_model
-        if not settings.openai_api_key:
-            logger.warning("OpenAI API key not configured")
-            self.client = None
+        """Initialize the LLM service with OpenAI or Azure OpenAI client."""
+        self.is_azure = settings.use_azure_openai
+
+        if self.is_azure:
+            # Azure OpenAI configuration
+            if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+                logger.warning("Azure OpenAI endpoint or API key not configured")
+                self.client = None
+            else:
+                self.client = AsyncAzureOpenAI(
+                    azure_endpoint=settings.azure_openai_endpoint,
+                    api_key=settings.azure_openai_api_key,
+                    api_version=settings.azure_openai_api_version
+                )
+                self.model = settings.azure_openai_deployment
+                self.embedding_model = settings.azure_openai_embedding_deployment or settings.azure_openai_deployment
+                logger.info(f"LLM Service initialized with Azure OpenAI deployment: {self.model}")
         else:
-            self.client = AsyncOpenAI(api_key=settings.openai_api_key)
-            logger.info(f"LLM Service initialized with model: {self.model}")
+            # Standard OpenAI configuration
+            self.model = settings.openai_model
+            self.embedding_model = settings.openai_embedding_model
+            if not settings.openai_api_key:
+                logger.warning("OpenAI API key not configured")
+                self.client = None
+            else:
+                self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+                logger.info(f"LLM Service initialized with OpenAI model: {self.model}")
 
     async def select_relevant_tables(
         self,
@@ -111,6 +130,7 @@ class LLMService:
         )
 
         # Parse table names from response
+        logger.debug(f"Stage 1 raw response from LLM: {response_text[:500]}")
         selected_tables = self._parse_table_names(response_text, table_names)
 
         logger.info(
@@ -389,6 +409,7 @@ Your SQL query:"""
         Call OpenAI API with exponential backoff retry logic.
 
         Handles transient errors like rate limits and network issues.
+        Automatically handles differences between Azure and standard OpenAI.
 
         Args:
             messages: Chat messages for the API
@@ -408,20 +429,36 @@ Your SQL query:"""
         for attempt in range(max_retries):
             try:
                 logger.debug(
-                    f"Calling OpenAI API (attempt {attempt + 1}/{max_retries})"
+                    f"Calling {'Azure ' if self.is_azure else ''}OpenAI API (attempt {attempt + 1}/{max_retries})"
                 )
 
-                response = await self.client.chat.completions.create(
-                    model=settings.openai_model,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=temperature
-                )
+                # Build API call parameters
+                api_params = {
+                    "model": self.model,
+                    "messages": messages,
+                }
+
+                # Handle parameter differences between Azure and standard OpenAI
+                if self.is_azure:
+                    # Azure OpenAI uses max_completion_tokens for newer API versions
+                    api_params["max_completion_tokens"] = max_tokens
+                    # Some Azure deployments don't support temperature=0.0
+                    # Only add temperature if it's not the problematic 0.0 value
+                    if temperature != 0.0:
+                        api_params["temperature"] = temperature
+                    else:
+                        logger.debug("Skipping temperature=0.0 for Azure OpenAI (may not be supported)")
+                else:
+                    # Standard OpenAI uses max_tokens
+                    api_params["max_tokens"] = max_tokens
+                    api_params["temperature"] = temperature
+
+                response = await self.client.chat.completions.create(**api_params)
 
                 response_text = response.choices[0].message.content
 
                 logger.info(
-                    f"OpenAI API call successful: {response.usage.total_tokens} tokens used"
+                    f"{'Azure ' if self.is_azure else ''}OpenAI API call successful: {response.usage.total_tokens} tokens used"
                 )
 
                 return response_text
@@ -534,9 +571,15 @@ Your SQL query:"""
                     logger.warning(f"LLM suggested invalid table name: '{name}'")
 
         if not validated:
-            logger.error(f"No valid table names found in response: {response_text}")
+            logger.error(
+                f"No valid table names found in response.\n"
+                f"Raw response: {response_text[:200]}\n"
+                f"Parsed candidates: {table_names}\n"
+                f"Available tables sample: {list(valid_table_names_lower.keys())[:10]}"
+            )
             raise ValueError(
-                "LLM did not return valid table names. Please try rephrasing your question."
+                f"LLM did not return valid table names. Response was: '{response_text[:100]}...'. "
+                f"Please try rephrasing your question."
             )
 
         # Remove duplicates while preserving order
@@ -624,6 +667,7 @@ Your SQL query:"""
         Generate embedding vector for text using OpenAI embeddings API.
 
         Used for RAG-based similarity search in knowledge base.
+        Works with both standard OpenAI and Azure OpenAI.
 
         Args:
             text: Text to generate embedding for (SQL query or question)
@@ -647,7 +691,7 @@ Your SQL query:"""
 
         try:
             response = await self.client.embeddings.create(
-                model=settings.openai_embedding_model,
+                model=self.embedding_model,
                 input=text
             )
 

@@ -94,3 +94,5 @@ frontend/.env.local
 *.temp
 tmp/
 temp/
+
+test_openai_connection.py
