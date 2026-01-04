@@ -96,3 +96,7 @@ tmp/
 temp/
 
 test_openai_connection.py
+.ai
+
+# Claude Code custom instructions (local only)
+*.mdc
