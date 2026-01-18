@@ -44,8 +44,10 @@
 
 /* Initial state - centered form */
 .centered-form {
-  max-width: 700px;
+  max-width: 900px;
+  width: 100%;
   margin: 0 auto;
+  padding: 0 2rem;
 }
 
 /* Chat mode - full width content */
@@ -178,5 +180,6 @@
 
   .centered-form {
     max-width: 100%;
+    padding: 0 1rem;
   }
 }

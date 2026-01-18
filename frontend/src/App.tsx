@@ -10,6 +10,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import LoginView from '@/views/LoginView';
 import QueryInterfaceView from '@/views/QueryInterfaceView';
 import QueryHistoryView from '@/views/QueryHistoryView';
+import QueryDetailView from '@/views/QueryDetailView';
 
 /**
  * Main App Component
@@ -40,6 +41,15 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <QueryHistoryView />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/query/:id"
+              element={
+                <ProtectedRoute>
+                  <QueryDetailView />
                 </ProtectedRoute>
               }
             />

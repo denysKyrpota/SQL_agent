@@ -13,7 +13,7 @@ import QueryFilters from './components/QueryFilters';
 import QueryHistoryTable from './components/QueryHistoryTable';
 import { isAPIError } from '@/types/api';
 import type { SimplifiedQueryAttempt, QueryStatus } from '@/types/models';
-import './QueryHistoryView.module.css';
+import styles from './QueryHistoryView.module.css';
 
 const QueryHistoryView: React.FC = () => {
   const navigate = useNavigate();
@@ -141,7 +141,7 @@ const QueryHistoryView: React.FC = () => {
   };
 
   return (
-    <div className="query-history-view">
+    <div className={styles['query-history-view']}>
       {/* Toast Notifications */}
       {toast && (
         <Toast
@@ -151,12 +151,12 @@ const QueryHistoryView: React.FC = () => {
         />
       )}
 
-      <div className="query-history-container">
+      <div className={styles['query-history-container']}>
         {/* Header */}
-        <div className="query-history-header">
+        <div className={styles['query-history-header']}>
           <div>
             <h1>Query History</h1>
-            <p className="subtitle">
+            <p className={styles['subtitle']}>
               View and manage your past queries
               {user?.role === 'admin' && ' (all users)'}
             </p>
@@ -175,16 +175,16 @@ const QueryHistoryView: React.FC = () => {
 
         {/* Loading State */}
         {isLoading && (
-          <div className="loading-state">
-            <div className="spinner" />
+          <div className={styles['loading-state']}>
+            <div className={styles['spinner']} />
             <p>Loading queries...</p>
           </div>
         )}
 
         {/* Empty State */}
         {!isLoading && queries.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-icon">📋</div>
+          <div className={styles['empty-state']}>
+            <div className={styles['empty-icon']}>📋</div>
             <h2>No queries found</h2>
             <p>
               {statusFilter === 'all'
@@ -209,7 +209,7 @@ const QueryHistoryView: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="pagination-container">
+              <div className={styles['pagination-container']}>
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -222,7 +222,7 @@ const QueryHistoryView: React.FC = () => {
 
         {/* Stats Footer */}
         {!isLoading && queries.length > 0 && (
-          <div className="stats-footer">
+          <div className={styles['stats-footer']}>
             <p>
               Showing <strong>{queries.length}</strong> queries on page{' '}
               <strong>{currentPage}</strong> of <strong>{totalPages}</strong>

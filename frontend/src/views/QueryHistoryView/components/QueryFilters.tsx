@@ -4,7 +4,7 @@
 
 import React from 'react';
 import type { QueryStatus } from '@/types/models';
-import './QueryFilters.module.css';
+import styles from './QueryFilters.module.css';
 
 interface QueryFiltersProps {
   currentFilter: QueryStatus | 'all';
@@ -25,20 +25,20 @@ const QueryFilters: React.FC<QueryFiltersProps> = ({
   ];
 
   return (
-    <div className="query-filters">
-      <div className="filter-label">Filter by status:</div>
-      <div className="filter-buttons">
+    <div className={styles['query-filters']}>
+      <div className={styles['filter-label']}>Filter by status:</div>
+      <div className={styles['filter-buttons']}>
         {filters.map((filter) => (
           <button
             key={filter.value}
-            className={`filter-button ${
-              currentFilter === filter.value ? 'active' : ''
+            className={`${styles['filter-button']} ${
+              currentFilter === filter.value ? styles['active'] : ''
             }`}
             onClick={() => onFilterChange(filter.value)}
           >
             {filter.label}
             {filter.count !== undefined && (
-              <span className="filter-count">{filter.count}</span>
+              <span className={styles['filter-count']}>{filter.count}</span>
             )}
           </button>
         ))}

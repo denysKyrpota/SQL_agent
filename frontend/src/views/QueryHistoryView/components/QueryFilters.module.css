@@ -42,7 +42,7 @@
   background-color: var(--color-gray-50);
 }
 
-.filter-button.active {
+.active {
   border-color: var(--color-primary);
   background-color: var(--color-primary);
   color: white;
@@ -61,7 +61,7 @@
   font-weight: 600;
 }
 
-.filter-button.active .filter-count {
+.active .filter-count {
   background-color: rgba(255, 255, 255, 0.2);
 }
 

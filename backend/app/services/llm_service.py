@@ -30,6 +30,7 @@ class LLMService:
     def __init__(self):
         """Initialize the LLM service with OpenAI or Azure OpenAI client."""
         self.is_azure = settings.use_azure_openai
+        self._azure_supports_temperature = True  # Will be set to False if we detect it's not supported
 
         if self.is_azure:
             # Azure OpenAI configuration
@@ -122,16 +123,48 @@ class LLMService:
             "content": prompt
         })
 
-        # Call OpenAI with retry logic
-        response_text = await self._call_openai_with_retry(
-            messages=messages,
-            max_tokens=500,  # Table names only, should be short
-            temperature=0.0  # Deterministic selection
-        )
+        # Call OpenAI with retry logic - try up to 3 times if we get empty/invalid response
+        response_text = ""
+        selected_tables = []
+        last_error = None
 
-        # Parse table names from response
-        logger.debug(f"Stage 1 raw response from LLM: {response_text[:500]}")
-        selected_tables = self._parse_table_names(response_text, table_names)
+        for attempt in range(3):
+            try:
+                response_text = await self._call_openai_with_retry(
+                    messages=messages,
+                    max_tokens=500,  # Table names only, should be short
+                    temperature=0.0  # Deterministic selection
+                )
+
+                if not response_text or not response_text.strip():
+                    logger.warning(f"LLM returned empty response for table selection (attempt {attempt + 1}/3)")
+                    if attempt < 2:
+                        await asyncio.sleep(1.0)  # Brief pause before retry
+                    continue
+
+                # Parse table names from response
+                logger.debug(f"Stage 1 raw response from LLM (attempt {attempt + 1}): {response_text[:500]}")
+                selected_tables = self._parse_table_names(response_text, table_names)
+
+                if selected_tables:
+                    break  # Success!
+
+            except ValueError as e:
+                last_error = e
+                logger.warning(f"Table selection parsing failed (attempt {attempt + 1}/3): {e}")
+                if attempt < 2:
+                    await asyncio.sleep(1.0)  # Brief pause before retry
+                continue
+
+        # Handle failure after all retries
+        if not selected_tables:
+            error_detail = f" Last error: {last_error}" if last_error else ""
+            logger.error(f"Failed to select tables after 3 attempts for question: {question}.{error_detail}")
+            raise ValueError(
+                f"Could not identify relevant tables for your question. "
+                f"This database contains logistics/transportation data (activities, drivers, vehicles, customers, contracts). "
+                f"Try rephrasing with domain-specific terms."
+            )
 
         logger.info(
             f"Stage 1 complete: Selected {len(selected_tables)} tables: {selected_tables}"
@@ -165,7 +198,7 @@ class LLMService:
         if conversation_history:
             context_note = "\nNote: Consider the conversation history above when selecting tables."
 
-        prompt = f"""You are analyzing a PostgreSQL database to answer a question.
+        prompt = f"""You are analyzing a PostgreSQL database for a logistics/transportation company to answer a question.
 
 DATABASE TABLES ({len(table_names)} total):
 {tables_list}
@@ -174,15 +207,28 @@ USER QUESTION:
 "{question}"{context_note}
 
 TASK:
-Select the {max_tables} most relevant tables needed to answer this question.
-Consider:
-1. Tables directly mentioned or implied by the question
-2. Junction tables that connect the main tables
-3. Tables containing foreign keys to the main entities
+Select the {max_tables} most relevant tables from the DATABASE TABLES list above.
+
+CRITICAL RULES:
+1. You MUST ONLY return table names that appear EXACTLY in the DATABASE TABLES list above
+2. NEVER return empty - always find at least one relevant table from the list
+3. If user terminology doesn't match table names exactly, find the closest semantic match:
+   - "orders" → look for activity_, customer_contract, invoice_ tables
+   - "customers" → look for customer_ tables
+   - "products" → look for cost_costproduct, integration_ tables
+   - "users" or "employees" → look for auth_user, asset_driver tables
+   - "vehicles", "trucks", "cars", "fleet" → look for asset_vehicle, asset_trailer, asset_assignment tables
+   - "drivers" → look for asset_driver, auth_user tables
+   - "activities", "tasks", "jobs", "work" → look for activity_activity tables
+   - "active" usually means checking a boolean field or status, not a separate table
+4. Consider tables that might contain the requested information even if named differently
+5. Include junction tables that connect related entities
+6. When in doubt, include more tables rather than fewer - it's better to include extra tables than miss important ones
 
 RESPONSE FORMAT:
-Return ONLY a comma-separated list of table names, nothing else.
-Example: "activity_activity, auth_user, asset_assignment"
+Return ONLY a comma-separated list of exact table names from the list above.
+Do not include any explanation, just the table names.
+Example: activity_activity, auth_user, customer_customer
 
 Your response:"""
 
@@ -442,12 +488,9 @@ Your SQL query:"""
                 if self.is_azure:
                     # Azure OpenAI uses max_completion_tokens for newer API versions
                     api_params["max_completion_tokens"] = max_tokens
-                    # Some Azure deployments don't support temperature=0.0
-                    # Only add temperature if it's not the problematic 0.0 value
-                    if temperature != 0.0:
+                    # Only add temperature if the deployment supports it
+                    if self._azure_supports_temperature:
                         api_params["temperature"] = temperature
-                    else:
-                        logger.debug("Skipping temperature=0.0 for Azure OpenAI (may not be supported)")
                 else:
                     # Standard OpenAI uses max_tokens
                     api_params["max_tokens"] = max_tokens
@@ -492,6 +535,18 @@ Your SQL query:"""
                     ) from e
 
             except APIError as e:
+                error_str = str(e)
+
+                # Check if this is a "temperature not supported" error from Azure
+                if self.is_azure and "temperature" in error_str.lower() and "unsupported" in error_str.lower():
+                    logger.warning(
+                        f"Azure deployment does not support temperature parameter. "
+                        f"Disabling temperature and retrying. This may result in less deterministic responses."
+                    )
+                    self._azure_supports_temperature = False
+                    # Immediate retry without temperature (don't count as failed attempt)
+                    continue
+
                 # General API error - retry once
                 logger.error(f"OpenAI API error (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
@@ -533,6 +588,16 @@ Your SQL query:"""
         """
         # Clean response
         cleaned = response_text.strip()
+
+        # Check for refusal patterns that indicate LLM didn't understand
+        refusal_patterns = [
+            "i cannot", "i can't", "i don't know", "i'm not sure",
+            "unable to", "no tables", "not possible", "cannot determine",
+            "insufficient information", "need more context"
+        ]
+        if any(pattern in cleaned.lower() for pattern in refusal_patterns):
+            logger.warning(f"LLM appears to have refused or been uncertain: {cleaned[:200]}")
+            raise ValueError(f"LLM could not determine tables: {cleaned[:100]}")
 
         # Remove common prefixes/suffixes
         for remove_str in ["```", "sql", "SELECT", "FROM"]:

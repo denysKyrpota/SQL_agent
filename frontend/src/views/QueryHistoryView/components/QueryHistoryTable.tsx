@@ -7,7 +7,7 @@ import Button from '@/components/Button';
 import type { SimplifiedQueryAttempt } from '@/types/models';
 import { formatDate, formatTimeAgo } from '../utils/dateUtils';
 import { getStatusBadge } from '../utils/statusUtils';
-import './QueryHistoryTable.module.css';
+import styles from './QueryHistoryTable.module.css';
 
 interface QueryHistoryTableProps {
   queries: SimplifiedQueryAttempt[];
@@ -23,14 +23,14 @@ const QueryHistoryTable: React.FC<QueryHistoryTableProps> = ({
   rerunningId,
 }) => {
   return (
-    <div className="query-history-table-container">
-      <table className="query-history-table">
+    <div className={styles['query-history-table-container']}>
+      <table className={styles['query-history-table']}>
         <thead>
           <tr>
             <th>Query</th>
             <th>Status</th>
-            <th>Submitted</th>
-            <th>Results</th>
+            <th>Created</th>
+            <th>Executed</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -38,44 +38,49 @@ const QueryHistoryTable: React.FC<QueryHistoryTableProps> = ({
           {queries.map((query) => (
             <tr key={query.id}>
               {/* Query Text */}
-              <td className="query-text-cell">
-                <div className="query-text" title={query.natural_language_query}>
+              <td className={styles['query-text-cell']}>
+                <div className={styles['query-text']} title={query.natural_language_query}>
                   {query.natural_language_query}
                 </div>
-                <div className="query-meta">
-                  ID: {query.id} • User: {query.user_id}
+                <div className={styles['query-meta']}>
+                  ID: {query.id}
                 </div>
               </td>
 
               {/* Status */}
-              <td className="status-cell">
+              <td className={styles['status-cell']}>
                 {getStatusBadge(query.status)}
               </td>
 
-              {/* Submitted Date */}
-              <td className="date-cell">
-                <div className="date-primary">
-                  {formatTimeAgo(query.submitted_at)}
+              {/* Created Date */}
+              <td className={styles['date-cell']}>
+                <div className={styles['date-primary']}>
+                  {formatTimeAgo(query.created_at)}
                 </div>
-                <div className="date-secondary">
-                  {formatDate(query.submitted_at)}
+                <div className={styles['date-secondary']}>
+                  {formatDate(query.created_at)}
                 </div>
               </td>
 
-              {/* Results */}
-              <td className="results-cell">
-                {query.status === 'success' && query.row_count !== null ? (
-                  <div className="results-info">
-                    <strong>{query.row_count.toLocaleString()}</strong> rows
-                  </div>
+              {/* Executed Date */}
+              <td className={styles['date-cell']}>
+                {query.executed_at ? (
+                  <>
+                    <div className={styles['date-primary']}>
+                      {formatTimeAgo(query.executed_at)}
+                    </div>
+                    <div className={styles['date-secondary']}>
+                      {formatDate(query.executed_at)}
+                    </div>
+                  </>
                 ) : (
-                  <span className="no-results">—</span>
+                  <span className={styles['no-results']}>—</span>
                 )}
               </td>
 
               {/* Actions */}
-              <td className="actions-cell">
-                <div className="action-buttons">
+              <td className={styles['actions-cell']}>
+                <div className={styles['action-buttons']}>
                   <Button
                     variant="secondary"
                     size="small"
