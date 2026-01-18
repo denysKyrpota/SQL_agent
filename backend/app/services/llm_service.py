@@ -8,6 +8,7 @@ Implements a two-stage SQL generation process:
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from openai import AsyncOpenAI, AsyncAzureOpenAI, RateLimitError, APIError, APIConnectionError
@@ -674,6 +675,8 @@ Your SQL query:"""
         """
         cleaned = response_text.strip()
 
+        logger.debug(f"Raw LLM response for SQL extraction: {cleaned[:500]}")
+
         # Remove markdown code blocks
         if "```sql" in cleaned.lower():
             # Extract content between ```sql and ```
@@ -687,6 +690,23 @@ Your SQL query:"""
             parts = cleaned.split("```")
             if len(parts) >= 2:
                 cleaned = parts[1].strip()
+
+        # If still doesn't start with SELECT/WITH, try to find it in the response
+        cleaned_upper = cleaned.upper()
+        if not (cleaned_upper.startswith("SELECT") or cleaned_upper.startswith("WITH")):
+            # Try to find SELECT or WITH statement in the response
+            # Look for SELECT or WITH at the start of a line
+            select_match = re.search(r'(?:^|\n)(SELECT\s)', cleaned, re.IGNORECASE)
+            with_match = re.search(r'(?:^|\n)(WITH\s)', cleaned, re.IGNORECASE)
+
+            if select_match:
+                start_pos = select_match.start(1)
+                cleaned = cleaned[start_pos:].strip()
+                logger.debug(f"Found SELECT at position {start_pos}, extracted SQL")
+            elif with_match:
+                start_pos = with_match.start(1)
+                cleaned = cleaned[start_pos:].strip()
+                logger.debug(f"Found WITH at position {start_pos}, extracted SQL")
 
         # Ensure ends with semicolon
         if not cleaned.endswith(";"):
@@ -703,7 +723,6 @@ Your SQL query:"""
 
         # Check for dangerous commands - use word boundary matching to avoid false positives
         # with column names like "created_at" or table names containing these words
-        import re
         dangerous_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]
         for keyword in dangerous_keywords:
             # Match as a standalone word (not part of column/table names)
