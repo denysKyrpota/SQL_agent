@@ -1,0 +1,371 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  # ============================================================================
+  # Job 1: Linting (runs first, blocks everything else)
+  # ============================================================================
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Backend linting
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Black (Python formatter check)
+        run: black --check backend/
+
+      - name: Run Flake8 (Python linter)
+        run: flake8 backend/
+
+      - name: Run MyPy (Python type checker)
+        run: mypy backend/
+
+      # Frontend linting
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint (TypeScript linter)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        working-directory: frontend
+        run: npm run type-check
+
+  # ============================================================================
+  # Job 2: Unit Tests (runs in parallel with E2E after linting)
+  # ============================================================================
+  unit-test:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL: sqlite:///./data/app_data/sqlite_test.db
+      SECRET_KEY: test-secret-key-for-ci
+      SESSION_EXPIRATION_HOURS: 8
+      POSTGRES_TIMEOUT: 30
+      OPENAI_MAX_TOKENS: 1000
+      OPENAI_TEMPERATURE: 0.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=backend \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --junitxml=pytest-report.xml
+
+      - name: Upload coverage to artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-coverage
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: pytest-report.xml
+          retention-days: 30
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
+          echo "Coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "❌ Coverage ${COVERAGE}% is below 70% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage ${COVERAGE}% meets threshold"
+
+  # ============================================================================
+  # Job 3: E2E Tests (runs in parallel with unit tests after linting)
+  # ============================================================================
+  e2e-test:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 30
+    environment: integration
+
+    env:
+      # Database configuration
+      DATABASE_URL: sqlite:///./data/app_data/sqlite_e2e.db
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+
+      # OpenAI configuration
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-4
+      OPENAI_EMBEDDING_MODEL: text-embedding-3-small
+      RAG_SIMILARITY_THRESHOLD: 0.85
+
+      # Azure OpenAI (optional)
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      AZURE_OPENAI_API_VERSION: 2024-02-15-preview
+      AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+
+      # Auth configuration
+      SECRET_KEY: e2e-test-secret-key
+      SESSION_EXPIRATION_HOURS: 8
+
+      # Performance configuration
+      POSTGRES_TIMEOUT: 30
+      OPENAI_MAX_TOKENS: 1000
+      OPENAI_TEMPERATURE: 0.0
+
+      # Playwright configuration
+      PLAYWRIGHT_BASE_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Python for backend
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Setup Node.js for frontend and Playwright
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install root dependencies (Playwright)
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Install Playwright browsers
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Initialize test database
+        run: make db-init
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # Run Playwright tests
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/results.xml
+          retention-days: 30
+
+  # ============================================================================
+  # Job 4: Status Comment (runs only if all previous jobs pass)
+  # ============================================================================
+  status-comment:
+    name: Post PR Status Comment
+    runs-on: ubuntu-latest
+    needs: [lint, unit-test, e2e-test]
+    if: always()
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: unit-test-coverage
+          path: ./artifacts/unit-coverage
+
+      - name: Download unit test results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: unit-test-results
+          path: ./artifacts/unit-results
+
+      - name: Download E2E test report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: e2e-test-report
+          path: ./artifacts/e2e-report
+
+      - name: Parse test results and create comment
+        id: test-summary
+        run: |
+          # Determine overall status
+          LINT_STATUS="${{ needs.lint.result }}"
+          UNIT_STATUS="${{ needs.unit-test.result }}"
+          E2E_STATUS="${{ needs.e2e-test.result }}"
+
+          # Status emojis
+          if [ "$LINT_STATUS" == "success" ]; then LINT_ICON="✅"; else LINT_ICON="❌"; fi
+          if [ "$UNIT_STATUS" == "success" ]; then UNIT_ICON="✅"; else UNIT_ICON="❌"; fi
+          if [ "$E2E_STATUS" == "success" ]; then E2E_ICON="✅"; else E2E_ICON="❌"; fi
+
+          # Overall status
+          if [ "$LINT_STATUS" == "success" ] && [ "$UNIT_STATUS" == "success" ] && [ "$E2E_STATUS" == "success" ]; then
+            OVERALL_STATUS="✅ All checks passed"
+            OVERALL_COLOR="success"
+          else
+            OVERALL_STATUS="❌ Some checks failed"
+            OVERALL_COLOR="failure"
+          fi
+
+          # Parse coverage if available
+          if [ -f "./artifacts/unit-coverage/coverage.xml" ]; then
+            COVERAGE=$(python3 -c "import xml.etree.ElementTree as ET; tree = ET.parse('./artifacts/unit-coverage/coverage.xml'); root = tree.getroot(); print(f\"{float(root.attrib['line-rate']) * 100:.1f}\")" 2>/dev/null || echo "N/A")
+          else
+            COVERAGE="N/A"
+          fi
+
+          # Create comment body
+          cat << EOF > comment.md
+          ## $OVERALL_STATUS
+
+          ### Test Results Summary
+
+          | Check | Status | Details |
+          |-------|--------|---------|
+          | ${LINT_ICON} Linting | \`$LINT_STATUS\` | Code quality and style checks |
+          | ${UNIT_ICON} Unit Tests | \`$UNIT_STATUS\` | Backend Python tests (Coverage: ${COVERAGE}%) |
+          | ${E2E_ICON} E2E Tests | \`$E2E_STATUS\` | Playwright browser tests |
+
+          ### Details
+
+          - **Commit**: \`${{ github.event.pull_request.head.sha }}\`
+          - **Branch**: \`${{ github.event.pull_request.head.ref }}\`
+          - **Triggered by**: @${{ github.event.pull_request.user.login }}
+
+          ---
+
+          <details>
+          <summary>📊 Coverage Details</summary>
+
+          Backend unit test coverage: **${COVERAGE}%** (threshold: 70%)
+
+          </details>
+
+          <details>
+          <summary>🔗 Artifacts</summary>
+
+          - [Unit Test Coverage Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [E2E Test Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Full CI Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          </details>
+          EOF
+
+          # Save for next step
+          echo "overall_color=$OVERALL_COLOR" >> $GITHUB_OUTPUT
+
+      - name: Find existing comment
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Test Results Summary'
+
+      - name: Create or update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: comment.md
+          edit-mode: replace
+
+      - name: Set final status
+        run: |
+          if [ "${{ steps.test-summary.outputs.overall_color }}" == "failure" ]; then
+            echo "❌ CI checks failed"
+            exit 1
+          else
+            echo "✅ All CI checks passed"
+          fi

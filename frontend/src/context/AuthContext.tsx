@@ -121,9 +121,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setAuthState({
         user: response.user,
         session: {
-          id: response.session.id,
-          user_id: response.session.user_id,
-          created_at: response.session.created_at,
           expires_at: response.session.expires_at,
         },
         isLoading: false,

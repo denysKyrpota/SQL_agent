@@ -1,0 +1,20 @@
+{
+  "name": "sql-ai-agent",
+  "version": "1.0.0",
+  "description": "SQL AI Agent - Text-to-SQL application with E2E tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report playwright-report",
+    "test:e2e:codegen": "playwright codegen http://localhost:5173",
+    "playwright:install": "playwright install --with-deps"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@playwright/test": "^1.57.0"
+  }
+}

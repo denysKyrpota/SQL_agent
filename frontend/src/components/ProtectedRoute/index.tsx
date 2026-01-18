@@ -5,6 +5,7 @@
 import React, { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import AppHeader from '@/components/AppHeader';
 
 interface ProtectedRouteProps {
   /** Child components to render if authenticated */
@@ -79,7 +80,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Authenticated and authorized
-  return <>{children}</>;
+  return (
+    <>
+      <AppHeader />
+      {children}
+    </>
+  );
 };
 
 export default ProtectedRoute;

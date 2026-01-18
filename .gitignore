@@ -74,6 +74,9 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+playwright-report/
+test-results/
+playwright/.cache/
 
 # Node (for frontend)
 node_modules/
