@@ -93,7 +93,7 @@ export interface QueryAttemptDetailResponse extends QueryAttemptDetail {}
  */
 export interface QueryListParams extends PaginationParams {
   /** Optional status filter */
-  status?: QueryStatus;
+  status_filter?: QueryStatus;
 }
 
 /**

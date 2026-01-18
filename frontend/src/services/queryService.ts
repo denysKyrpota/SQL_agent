@@ -116,11 +116,11 @@ export async function listQueries(
   }
 
   if (params.limit) {
-    queryParams.append('limit', params.limit.toString());
+    queryParams.append('page_size', params.limit.toString());
   }
 
-  if (params.status) {
-    queryParams.append('status', params.status);
+  if (params.status_filter) {
+    queryParams.append('status_filter', params.status_filter);
   }
 
   const queryString = queryParams.toString();

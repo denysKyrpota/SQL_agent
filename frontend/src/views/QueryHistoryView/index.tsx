@@ -46,7 +46,7 @@ const QueryHistoryView: React.FC = () => {
       };
 
       if (statusFilter !== 'all') {
-        params.status = statusFilter;
+        params.status_filter = statusFilter;
       }
 
       const response = await listQueries(params);
