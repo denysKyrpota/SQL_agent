@@ -13,9 +13,7 @@ class LoginRequest(BaseModel):
     username: str = Field(
         min_length=1, max_length=255, description="Username for authentication"
     )
-    password: str = Field(
-        min_length=8, max_length=255, description="User password"
-    )
+    password: str = Field(min_length=8, max_length=255, description="User password")
 
     @field_validator("username")
     @classmethod

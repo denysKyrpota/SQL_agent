@@ -36,6 +36,7 @@ class QueryResult:
         total_rows: Total number of rows returned
         execution_ms: Execution time in milliseconds
     """
+
     columns: list[str]
     rows: list[list[Any]]
     total_rows: int
@@ -71,7 +72,9 @@ class PostgresExecutionService:
                     "Set POSTGRES_URL in .env file."
                 )
 
-            logger.info(f"Creating PostgreSQL engine: {self._mask_password(settings.postgres_url)}")
+            logger.info(
+                f"Creating PostgreSQL engine: {self._mask_password(settings.postgres_url)}"
+            )
 
             self._engine = create_engine(
                 settings.postgres_url,
@@ -79,9 +82,7 @@ class PostgresExecutionService:
                 pool_size=5,  # MVP: 5 connections
                 max_overflow=10,  # Allow up to 15 total connections
                 pool_recycle=3600,  # Recycle connections after 1 hour
-                execution_options={
-                    "postgresql_readonly": True  # Read-only mode
-                }
+                execution_options={"postgresql_readonly": True},  # Read-only mode
             )
 
         return self._engine
@@ -89,7 +90,8 @@ class PostgresExecutionService:
     def _mask_password(self, url: str) -> str:
         """Mask password in connection string for logging."""
         import re
-        return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+
+        return re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", url)
 
     def validate_sql(self, sql: str) -> None:
         """
@@ -133,7 +135,7 @@ class PostgresExecutionService:
         # Get statement type
         stmt_type = stmt.get_type()
 
-        if stmt_type != 'SELECT':
+        if stmt_type != "SELECT":
             raise ValueError(
                 f"Only SELECT queries are allowed. Found: {stmt_type}. "
                 f"INSERT, UPDATE, DELETE, CREATE, DROP, and other modification commands are forbidden."
@@ -142,15 +144,28 @@ class PostgresExecutionService:
         # Additional check: scan for dangerous keywords in uppercase
         sql_upper = sql.upper()
         dangerous_keywords = [
-            'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',
-            'TRUNCATE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE'
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "CREATE",
+            "ALTER",
+            "TRUNCATE",
+            "GRANT",
+            "REVOKE",
+            "EXEC",
+            "EXECUTE",
         ]
 
         for keyword in dangerous_keywords:
             if keyword in sql_upper:
                 # Check if it's part of SELECT statement (e.g., in a string literal)
                 # Simple heuristic: if it appears before SELECT or after ;
-                if sql_upper.index(keyword) < sql_upper.index('SELECT') if 'SELECT' in sql_upper else True:
+                if (
+                    sql_upper.index(keyword) < sql_upper.index("SELECT")
+                    if "SELECT" in sql_upper
+                    else True
+                ):
                     raise ValueError(
                         f"Forbidden SQL keyword detected: {keyword}. "
                         f"Only SELECT queries are allowed."
@@ -158,11 +173,7 @@ class PostgresExecutionService:
 
         logger.debug("SQL validation passed")
 
-    async def execute_query(
-        self,
-        sql: str,
-        timeout: int | None = None
-    ) -> QueryResult:
+    async def execute_query(self, sql: str, timeout: int | None = None) -> QueryResult:
         """
         Execute SQL query against PostgreSQL database.
 
@@ -196,9 +207,7 @@ class PostgresExecutionService:
             engine = self._get_engine()
 
             # Execute query with timeout
-            with engine.connect().execution_options(
-                timeout=timeout
-            ) as connection:
+            with engine.connect().execution_options(timeout=timeout) as connection:
                 result = connection.execute(text(sql))
 
                 # Fetch all rows
@@ -219,15 +228,11 @@ class PostgresExecutionService:
                 ) from e
             else:
                 logger.error(f"Database operational error: {e}")
-                raise DatabaseExecutionError(
-                    f"Database connection error: {e}"
-                ) from e
+                raise DatabaseExecutionError(f"Database connection error: {e}") from e
 
         except ProgrammingError as e:
             logger.error(f"SQL programming error: {e}")
-            raise ValueError(
-                f"SQL syntax error: {e}"
-            ) from e
+            raise ValueError(f"SQL syntax error: {e}") from e
 
         except DatabaseError as e:
             logger.error(f"Database error: {e}")
@@ -235,9 +240,7 @@ class PostgresExecutionService:
 
         except Exception as e:
             logger.error(f"Unexpected error executing query: {e}", exc_info=True)
-            raise DatabaseExecutionError(
-                f"Unexpected database error: {e}"
-            ) from e
+            raise DatabaseExecutionError(f"Unexpected database error: {e}") from e
 
         # Calculate execution time
         end_time = datetime.utcnow()
@@ -253,13 +256,11 @@ class PostgresExecutionService:
             columns=columns,
             rows=rows_data,
             total_rows=total_rows,
-            execution_ms=execution_ms
+            execution_ms=execution_ms,
         )
 
     async def execute_query_attempt(
-        self,
-        db: Session,
-        query_attempt: QueryAttempt
+        self, db: Session, query_attempt: QueryAttempt
     ) -> QueryResult:
         """
         Execute a query attempt and store results.
@@ -299,9 +300,7 @@ class PostgresExecutionService:
 
             # Create results manifest for pagination
             manifest = self._create_results_manifest(
-                db=db,
-                query_attempt_id=query_attempt.id,
-                result=result
+                db=db, query_attempt_id=query_attempt.id, result=result
             )
 
             db.commit()
@@ -332,10 +331,7 @@ class PostgresExecutionService:
             raise
 
     def _create_results_manifest(
-        self,
-        db: Session,
-        query_attempt_id: int,
-        result: QueryResult
+        self, db: Session, query_attempt_id: int, result: QueryResult
     ) -> QueryResultsManifest:
         """
         Create QueryResultsManifest for paginated results.
@@ -366,7 +362,7 @@ class PostgresExecutionService:
             total_rows=result.total_rows,
             page_size=page_size,
             page_count=page_count,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
 
         db.add(manifest)
@@ -387,9 +383,11 @@ class PostgresExecutionService:
 
 class QueryTimeoutError(Exception):
     """Raised when query execution exceeds timeout."""
+
     pass
 
 
 class DatabaseExecutionError(Exception):
     """Raised when a database error occurs during query execution."""
+
     pass

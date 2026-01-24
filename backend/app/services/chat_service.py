@@ -57,7 +57,10 @@ class ChatService:
         logger.info("Chat service initialized with all dependencies")
 
     def create_conversation(
-        self, db: Session, user_id: int, request: CreateConversationRequest | None = None
+        self,
+        db: Session,
+        user_id: int,
+        request: CreateConversationRequest | None = None,
     ) -> ConversationResponse:
         """
         Create a new conversation for the user.
@@ -107,18 +110,16 @@ class ChatService:
         offset = (page - 1) * page_size
 
         # Get total count
-        total_count = db.query(func.count(Conversation.id)).filter(
-            Conversation.user_id == user_id,
-            Conversation.is_active == True
-        ).scalar()
+        total_count = (
+            db.query(func.count(Conversation.id))
+            .filter(Conversation.user_id == user_id, Conversation.is_active == True)
+            .scalar()
+        )
 
         # Get conversations
         conversations = (
             db.query(Conversation)
-            .filter(
-                Conversation.user_id == user_id,
-                Conversation.is_active == True
-            )
+            .filter(Conversation.user_id == user_id, Conversation.is_active == True)
             .order_by(Conversation.updated_at.desc())
             .offset(offset)
             .limit(page_size)
@@ -148,10 +149,11 @@ class ChatService:
         Raises:
             ValueError: If conversation not found or user doesn't have access
         """
-        conversation = db.query(Conversation).filter(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user_id
-        ).first()
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.id == conversation_id, Conversation.user_id == user_id)
+            .first()
+        )
 
         if not conversation:
             raise ValueError("Conversation not found or access denied")
@@ -166,8 +168,7 @@ class ChatService:
         message_responses = [self._message_to_response(msg) for msg in messages]
 
         return ConversationMessagesResponse(
-            conversation_id=conversation_id,
-            messages=message_responses
+            conversation_id=conversation_id, messages=message_responses
         )
 
     async def send_message(
@@ -194,16 +195,24 @@ class ChatService:
         """
         # Step 1: Get or create conversation
         if request.conversation_id:
-            conversation = db.query(Conversation).filter(
-                Conversation.id == request.conversation_id,
-                Conversation.user_id == user_id
-            ).first()
+            conversation = (
+                db.query(Conversation)
+                .filter(
+                    Conversation.id == request.conversation_id,
+                    Conversation.user_id == user_id,
+                )
+                .first()
+            )
 
             if not conversation:
                 raise ValueError("Conversation not found or access denied")
         else:
             # Create new conversation with title from first message preview
-            title = request.content[:50] + "..." if len(request.content) > 50 else request.content
+            title = (
+                request.content[:50] + "..."
+                if len(request.content) > 50
+                else request.content
+            )
             conversation = Conversation(
                 user_id=user_id,
                 title=title,
@@ -257,17 +266,22 @@ class ChatService:
 
             # Stage 2: Generate SQL with context
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
-            similar_kb_examples, _ = await self.kb.find_similar_examples(request.content, top_k=3)
+            schema_text = self.schema.format_schema_for_llm(filtered_schema)
+            similar_kb_examples, _ = await self.kb.find_similar_examples(
+                request.content, top_k=3
+            )
             similar_examples = [ex.sql for ex in similar_kb_examples]
 
             generated_sql = await self.llm.generate_sql(
                 question=request.content,
-                schema_text=filtered_schema,
+                schema_text=schema_text,
                 examples=similar_examples,
                 conversation_history=context_messages,
             )
 
-            generation_ms = int((datetime.utcnow() - generation_start).total_seconds() * 1000)
+            generation_ms = int(
+                (datetime.utcnow() - generation_start).total_seconds() * 1000
+            )
 
             # Create QueryAttempt for the generated SQL
             query_attempt = QueryAttemptModel(
@@ -290,11 +304,13 @@ class ChatService:
                 role="assistant",
                 content=assistant_content,
                 query_attempt_id=query_attempt.id,
-                message_metadata=json.dumps({
-                    "generation_ms": generation_ms,
-                    "tables_used": selected_tables,
-                    "model": self.llm.model,
-                }),
+                message_metadata=json.dumps(
+                    {
+                        "generation_ms": generation_ms,
+                        "tables_used": selected_tables,
+                        "model": self.llm.model,
+                    }
+                ),
             )
             db.add(assistant_message)
             db.commit()
@@ -352,10 +368,14 @@ class ChatService:
         if not original_message:
             raise ValueError("Message not found")
 
-        conversation = db.query(Conversation).filter(
-            Conversation.id == original_message.conversation_id,
-            Conversation.user_id == user_id
-        ).first()
+        conversation = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == original_message.conversation_id,
+                Conversation.user_id == user_id,
+            )
+            .first()
+        )
 
         if not conversation:
             raise ValueError("Access denied")
@@ -369,7 +389,7 @@ class ChatService:
             .filter(
                 Message.conversation_id == original_message.conversation_id,
                 Message.role == "user",
-                Message.created_at < original_message.created_at
+                Message.created_at < original_message.created_at,
             )
             .order_by(Message.created_at.desc())
             .first()
@@ -395,17 +415,22 @@ class ChatService:
             )
 
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
-            similar_kb_examples, _ = await self.kb.find_similar_examples(user_messages.content, top_k=3)
+            schema_text = self.schema.format_schema_for_llm(filtered_schema)
+            similar_kb_examples, _ = await self.kb.find_similar_examples(
+                user_messages.content, top_k=3
+            )
             similar_examples = [ex.sql for ex in similar_kb_examples]
 
             generated_sql = await self.llm.generate_sql(
                 question=user_messages.content,
-                schema_text=filtered_schema,
+                schema_text=schema_text,
                 examples=similar_examples,
                 conversation_history=context_messages,
             )
 
-            generation_ms = int((datetime.utcnow() - generation_start).total_seconds() * 1000)
+            generation_ms = int(
+                (datetime.utcnow() - generation_start).total_seconds() * 1000
+            )
 
             # Create new QueryAttempt
             query_attempt = QueryAttemptModel(
@@ -429,11 +454,13 @@ class ChatService:
                 query_attempt_id=query_attempt.id,
                 parent_message_id=message_id,
                 is_regenerated=True,
-                message_metadata=json.dumps({
-                    "generation_ms": generation_ms,
-                    "tables_used": selected_tables,
-                    "model": self.llm.model,
-                }),
+                message_metadata=json.dumps(
+                    {
+                        "generation_ms": generation_ms,
+                        "tables_used": selected_tables,
+                        "model": self.llm.model,
+                    }
+                ),
             )
             db.add(new_message)
             db.commit()
@@ -441,7 +468,10 @@ class ChatService:
 
             logger.info(
                 f"Regenerated message {new_message.id} from original {message_id}",
-                extra={"new_message_id": new_message.id, "original_message_id": message_id},
+                extra={
+                    "new_message_id": new_message.id,
+                    "original_message_id": message_id,
+                },
             )
 
             return self._message_to_response(new_message)
@@ -474,10 +504,14 @@ class ChatService:
         if not original_message:
             raise ValueError("Message not found")
 
-        conversation = db.query(Conversation).filter(
-            Conversation.id == original_message.conversation_id,
-            Conversation.user_id == user_id
-        ).first()
+        conversation = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == original_message.conversation_id,
+                Conversation.user_id == user_id,
+            )
+            .first()
+        )
 
         if not conversation:
             raise ValueError("Access denied")
@@ -532,18 +566,17 @@ class ChatService:
         # Reverse to get chronological order
         messages.reverse()
 
-        return [
-            {"role": msg.role, "content": msg.content}
-            for msg in messages
-        ]
+        return [{"role": msg.role, "content": msg.content} for msg in messages]
 
     def _conversation_to_response(
         self, db: Session, conversation: Conversation
     ) -> ConversationResponse:
         """Convert Conversation model to ConversationResponse schema."""
-        message_count = db.query(func.count(Message.id)).filter(
-            Message.conversation_id == conversation.id
-        ).scalar()
+        message_count = (
+            db.query(func.count(Message.id))
+            .filter(Message.conversation_id == conversation.id)
+            .scalar()
+        )
 
         return ConversationResponse(
             id=conversation.id,
@@ -562,7 +595,9 @@ class ChatService:
             try:
                 metadata = json.loads(message.message_metadata)
             except json.JSONDecodeError:
-                logger.warning(f"Failed to parse message_metadata for message {message.id}")
+                logger.warning(
+                    f"Failed to parse message_metadata for message {message.id}"
+                )
 
         return MessageResponse(
             id=message.id,

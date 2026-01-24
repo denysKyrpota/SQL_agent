@@ -4,12 +4,19 @@ User and Session ORM models.
 Handles user authentication and session management.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base
+
+if TYPE_CHECKING:
+    from backend.app.models.chat import Conversation
+    from backend.app.models.query import QueryAttempt
 
 
 class User(Base):
@@ -89,7 +96,9 @@ class Session(Base):
     user: Mapped["User"] = relationship("User", back_populates="sessions")
 
     def __repr__(self) -> str:
-        return f"<Session(id={self.id}, user_id={self.user_id}, revoked={self.revoked})>"
+        return (
+            f"<Session(id={self.id}, user_id={self.user_id}, revoked={self.revoked})>"
+        )
 
     def is_valid(self) -> bool:
         """Check if session is still valid (not expired and not revoked)."""

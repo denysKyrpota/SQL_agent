@@ -107,9 +107,7 @@ class SimplifiedQueryAttempt(BaseModel):
 class QueryListResponse(BaseModel):
     """Response for listing query attempts with pagination."""
 
-    queries: list[SimplifiedQueryAttempt] = Field(
-        description="List of query attempts"
-    )
+    queries: list[SimplifiedQueryAttempt] = Field(description="List of query attempts")
     pagination: PaginationMetadata = Field(description="Pagination metadata")
 
     class Config:

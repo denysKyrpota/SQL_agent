@@ -4,12 +4,19 @@ Query-related ORM models.
 Handles query attempts and results metadata.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base
+
+if TYPE_CHECKING:
+    from backend.app.models.chat import Message
+    from backend.app.models.user import User
 
 
 class QueryAttempt(Base):
@@ -106,8 +113,12 @@ class QueryResultsManifest(Base):
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Export metadata
-    export_row_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=10000)
-    export_truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    export_row_limit: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=10000
+    )
+    export_truncated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     export_file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Timestamp

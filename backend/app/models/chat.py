@@ -4,13 +4,27 @@ Chat ORM models.
 Handles conversational SQL generation with message history.
 """
 
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, CheckConstraint
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    CheckConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base
+
+if TYPE_CHECKING:
+    from backend.app.models.query import QueryAttempt
+    from backend.app.models.user import User
 
 
 class Conversation(Base):
@@ -47,8 +61,10 @@ class Conversation(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="conversations")
     messages: Mapped[list["Message"]] = relationship(
-        "Message", back_populates="conversation", cascade="all, delete-orphan",
-        order_by="Message.created_at"
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at",
     )
 
     def __repr__(self) -> str:
@@ -99,7 +115,9 @@ class Message(Base):
     message_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
-    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+    conversation: Mapped["Conversation"] = relationship(
+        "Conversation", back_populates="messages"
+    )
     query_attempt: Mapped[Optional["QueryAttempt"]] = relationship(
         "QueryAttempt", back_populates="message"
     )

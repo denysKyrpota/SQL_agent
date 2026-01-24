@@ -139,10 +139,12 @@ app.include_router(queries.router, prefix="/api", tags=["Queries"])
 
 # Chat endpoints
 from backend.app.api import chat
+
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 
 # Admin endpoints
 from backend.app.api import admin
+
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 
 # TODO: Add health check endpoint

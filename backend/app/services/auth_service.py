@@ -184,9 +184,7 @@ class AuthService:
         db.commit()
         db.refresh(session)
 
-        logger.info(
-            f"Session created for user {user.username} (expires: {expires_at})"
-        )
+        logger.info(f"Session created for user {user.username} (expires: {expires_at})")
         return session
 
     @staticmethod

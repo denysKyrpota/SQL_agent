@@ -31,6 +31,7 @@ class KBExample:
         sql: The actual SQL query
         embedding: Vector embedding for similarity search (optional)
     """
+
     filename: str
     title: str
     description: str | None
@@ -111,11 +112,11 @@ class KnowledgeBaseService:
         Returns:
             KBExample: Parsed example
         """
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Extract title (first line or from filename)
-        lines = content.strip().split('\n')
+        lines = content.strip().split("\n")
         title = self._extract_title(lines, file_path.stem)
 
         # Extract description (optional)
@@ -129,7 +130,7 @@ class KnowledgeBaseService:
             title=title,
             description=description,
             sql=sql,
-            embedding=None  # Will be populated if embeddings are enabled
+            embedding=None,  # Will be populated if embeddings are enabled
         )
 
     def _extract_title(self, lines: list[str], filename_stem: str) -> str:
@@ -143,17 +144,17 @@ class KnowledgeBaseService:
         Returns:
             str: Human-readable title
         """
-        if lines and not lines[0].strip().startswith(('SELECT', '--', '```')):
+        if lines and not lines[0].strip().startswith(("SELECT", "--", "```")):
             # First line is the title
             title = lines[0].strip()
             # Remove markdown code block markers
-            title = title.replace('```', '').strip()
+            title = title.replace("```", "").strip()
             if title:
                 return title
 
         # Convert filename to title
         # Example: "drivers_with_current_availability" -> "Drivers With Current Availability"
-        title = filename_stem.replace('_', ' ').title()
+        title = filename_stem.replace("_", " ").title()
         return title
 
     def _extract_description(self, content: str) -> str | None:
@@ -172,9 +173,9 @@ class KnowledgeBaseService:
         """
         # Look for description patterns
         patterns = [
-            r'--\s*Description:\s*(.+)',
-            r'--\s*Question:\s*(.+)',
-            r'/\*\s*Description:\s*(.+?)\*/',
+            r"--\s*Description:\s*(.+)",
+            r"--\s*Question:\s*(.+)",
+            r"/\*\s*Description:\s*(.+?)\*/",
         ]
 
         for pattern in patterns:
@@ -202,24 +203,36 @@ class KnowledgeBaseService:
         cleaned = content
 
         # Remove markdown code blocks
-        cleaned = re.sub(r'```sql\s*', '', cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r'```\s*$', '', cleaned)
-        cleaned = cleaned.replace('```', '')
+        cleaned = re.sub(r"```sql\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"```\s*$", "", cleaned)
+        cleaned = cleaned.replace("```", "")
 
         # Remove first line if it's a title (doesn't start with SELECT, --, etc.)
-        lines = cleaned.split('\n')
+        lines = cleaned.split("\n")
         # Skip empty lines at the beginning
         while lines and not lines[0].strip():
             lines = lines[1:]
         # Remove first non-empty line if it's a title
-        if lines and not lines[0].strip().upper().startswith(('SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', '--')):
+        if lines and not lines[0].strip().upper().startswith(
+            (
+                "SELECT",
+                "WITH",
+                "INSERT",
+                "UPDATE",
+                "DELETE",
+                "CREATE",
+                "ALTER",
+                "DROP",
+                "--",
+            )
+        ):
             lines = lines[1:]
 
-        cleaned = '\n'.join(lines).strip()
+        cleaned = "\n".join(lines).strip()
 
         # Ensure ends with semicolon
-        if not cleaned.endswith(';'):
-            cleaned += ';'
+        if not cleaned.endswith(";"):
+            cleaned += ";"
 
         return cleaned
 
@@ -286,9 +299,7 @@ class KnowledgeBaseService:
             if keyword_lower in example.sql.lower():
                 matching.append(example)
 
-        logger.info(
-            f"Keyword search for '{keyword}' found {len(matching)} examples"
-        )
+        logger.info(f"Keyword search for '{keyword}' found {len(matching)} examples")
 
         return matching
 
@@ -313,7 +324,9 @@ class KnowledgeBaseService:
             1.0
         """
         if len(vec1) != len(vec2):
-            raise ValueError(f"Vectors must have same length: {len(vec1)} vs {len(vec2)}")
+            raise ValueError(
+                f"Vectors must have same length: {len(vec1)} vs {len(vec2)}"
+            )
 
         # Calculate dot product
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
@@ -335,7 +348,7 @@ class KnowledgeBaseService:
         self,
         question: str,
         question_embedding: list[float] | None = None,
-        top_k: int = 3
+        top_k: int = 3,
     ) -> tuple[list[KBExample], float]:
         """
         Find most similar examples for a given question using embeddings.
@@ -369,9 +382,7 @@ class KnowledgeBaseService:
 
         if not embeddings_available or question_embedding is None:
             # Fallback: Return all examples without similarity ranking
-            logger.info(
-                f"Embeddings not available, returning first {top_k} examples"
-            )
+            logger.info(f"Embeddings not available, returning first {top_k} examples")
             return examples[:top_k], 0.0
 
         # Calculate similarity scores for all examples
@@ -412,15 +423,16 @@ class KnowledgeBaseService:
 
         embeddings_data = []
         for example in examples:
-            embeddings_data.append({
-                "filename": example.filename,
-                "embedding": example.embedding
-            })
+            embeddings_data.append(
+                {"filename": example.filename, "embedding": example.embedding}
+            )
 
-        with open(self._embeddings_file, 'w') as f:
+        with open(self._embeddings_file, "w") as f:
             json.dump(embeddings_data, f)
 
-        logger.info(f"Saved embeddings for {len(embeddings_data)} examples to {self._embeddings_file}")
+        logger.info(
+            f"Saved embeddings for {len(embeddings_data)} examples to {self._embeddings_file}"
+        )
 
     def load_embeddings(self) -> None:
         """
@@ -433,13 +445,15 @@ class KnowledgeBaseService:
             return
 
         try:
-            with open(self._embeddings_file, 'r') as f:
+            with open(self._embeddings_file, "r") as f:
                 embeddings_data = json.load(f)
 
             examples = self.get_examples()
 
             # Create a map of filename to embedding
-            embedding_map = {item["filename"]: item["embedding"] for item in embeddings_data}
+            embedding_map = {
+                item["filename"]: item["embedding"] for item in embeddings_data
+            }
 
             # Attach embeddings to examples
             loaded_count = 0
@@ -448,7 +462,9 @@ class KnowledgeBaseService:
                     example.embedding = embedding_map[example.filename]
                     loaded_count += 1
 
-            logger.info(f"Loaded embeddings for {loaded_count}/{len(examples)} examples")
+            logger.info(
+                f"Loaded embeddings for {loaded_count}/{len(examples)} examples"
+            )
 
         except Exception as e:
             logger.warning(f"Failed to load embeddings: {e}")
@@ -487,7 +503,9 @@ class KnowledgeBaseService:
 
             try:
                 # Generate embedding from example's SQL + title + description
-                text_to_embed = f"{example.title}\n{example.description or ''}\n{example.sql}"
+                text_to_embed = (
+                    f"{example.title}\n{example.description or ''}\n{example.sql}"
+                )
 
                 embedding = await llm_service.generate_embedding(text_to_embed)
                 example.embedding = embedding
@@ -496,7 +514,9 @@ class KnowledgeBaseService:
                 logger.info(f"Generated embedding for {example.filename}")
 
             except Exception as e:
-                logger.error(f"Failed to generate embedding for {example.filename}: {e}")
+                logger.error(
+                    f"Failed to generate embedding for {example.filename}: {e}"
+                )
                 continue
 
         # Save embeddings to disk
@@ -506,7 +526,9 @@ class KnowledgeBaseService:
             "total_examples": len(examples),
             "embeddings_generated": embeddings_generated,
             "embeddings_skipped": embeddings_skipped,
-            "embeddings_available": sum(1 for ex in examples if ex.embedding is not None)
+            "embeddings_available": sum(
+                1 for ex in examples if ex.embedding is not None
+            ),
         }
 
         logger.info(f"Embedding generation complete: {stats}")
@@ -562,10 +584,8 @@ class KnowledgeBaseService:
             "total_examples": len(examples),
             "total_sql_length": total_sql_length,
             "average_sql_length": avg_sql_length,
-            "examples_with_descriptions": sum(
-                1 for ex in examples if ex.description
-            ),
-            "kb_directory": str(self._kb_directory)
+            "examples_with_descriptions": sum(1 for ex in examples if ex.description),
+            "kb_directory": str(self._kb_directory),
         }
 
 

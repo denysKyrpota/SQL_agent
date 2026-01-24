@@ -13,6 +13,7 @@ Handles:
 
 import json
 import logging
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -56,6 +57,7 @@ export_service = ExportService()
 
 # Initialize knowledge base service for examples
 from backend.app.services.knowledge_base_service import KnowledgeBaseService
+
 kb_service = KnowledgeBaseService()
 
 
@@ -104,7 +106,7 @@ async def get_example_questions(
     """
     logger.info(
         f"User {current_user.id} requesting example questions",
-        extra={"user_id": current_user.id}
+        extra={"user_id": current_user.id},
     )
 
     try:
@@ -122,7 +124,7 @@ async def get_example_questions(
 
         logger.info(
             f"Returning {len(example_questions)} example questions",
-            extra={"count": len(example_questions)}
+            extra={"count": len(example_questions)},
         )
 
         return {"examples": example_questions}
@@ -131,11 +133,11 @@ async def get_example_questions(
         logger.error(
             f"Failed to load example questions: {e}",
             extra={"error": str(e)},
-            exc_info=True
+            exc_info=True,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to load example questions"
+            detail="Failed to load example questions",
         )
 
 
@@ -266,7 +268,11 @@ async def create_query(
             extra={
                 "attempt_id": result.id,
                 "user_id": user.id,
-                "status": result.status if isinstance(result.status, str) else result.status.value,
+                "status": (
+                    result.status
+                    if isinstance(result.status, str)
+                    else result.status.value
+                ),
                 "generation_ms": result.generation_ms,
             },
         )
@@ -352,7 +358,7 @@ async def get_query(
         )
 
     # Authorization check
-    if query.user_id != user.id and user.role != 'admin':
+    if query.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this query",
@@ -360,18 +366,30 @@ async def get_query(
 
     logger.info(f"GET /queries/{id} - User {user.id} retrieved query")
 
+    # Note: created_at is always set, but provide fallback for type safety
+    created_at_str = (
+        query.created_at.isoformat() + "Z"
+        if query.created_at
+        else datetime.utcnow().isoformat() + "Z"
+    )
     return QueryAttemptDetailResponse(
         id=query.id,
         natural_language_query=query.natural_language_query,
         generated_sql=query.generated_sql,
-        status=QueryStatus(query.status) if isinstance(query.status, str) else query.status,
-        created_at=query.created_at.isoformat() + "Z" if query.created_at else None,
-        generated_at=query.generated_at.isoformat() + "Z" if query.generated_at else None,
+        status=(
+            QueryStatus(query.status) if isinstance(query.status, str) else query.status
+        ),
+        created_at=created_at_str,
+        generated_at=(
+            query.generated_at.isoformat() + "Z" if query.generated_at else None
+        ),
         generation_ms=query.generation_ms,
         error_message=query.error_message,
         executed_at=query.executed_at.isoformat() + "Z" if query.executed_at else None,
         execution_ms=query.execution_ms,
-        original_attempt_id=query.original_attempt_id if hasattr(query, 'original_attempt_id') else None,
+        original_attempt_id=(
+            query.original_attempt_id if hasattr(query, "original_attempt_id") else None
+        ),
     )
 
 
@@ -420,7 +438,7 @@ async def list_queries(
     query = db.query(QueryAttempt)
 
     # Filter by user (unless admin)
-    if user.role != 'admin':
+    if user.role != "admin":
         query = query.filter(QueryAttempt.user_id == user.id)
 
     # Filter by status
@@ -443,9 +461,12 @@ async def list_queries(
             id=q.id,
             natural_language_query=q.natural_language_query,
             status=QueryStatus(q.status) if isinstance(q.status, str) else q.status,
-            created_at=q.created_at.isoformat() + "Z" if q.created_at else None,
+            created_at=(
+                q.created_at.isoformat() + "Z"
+                if q.created_at
+                else datetime.utcnow().isoformat() + "Z"
+            ),
             executed_at=q.executed_at.isoformat() + "Z" if q.executed_at else None,
-            generation_ms=q.generation_ms if hasattr(q, 'generation_ms') else None,
         )
         for q in query_attempts
     ]
@@ -514,7 +535,7 @@ async def execute_query(
         )
 
     # Authorization check
-    if query_attempt.user_id != user.id and user.role != 'admin':
+    if query_attempt.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to execute this query",
@@ -546,11 +567,19 @@ async def execute_query(
             f"Query {id} executed successfully: {result.total_rows} rows in {result.execution_ms}ms"
         )
 
+        # executed_at and execution_ms should be set after execution, provide fallbacks
+        executed_at_str = (
+            query_attempt.executed_at.isoformat() + "Z"
+            if query_attempt.executed_at
+            else datetime.utcnow().isoformat() + "Z"
+        )
+        execution_ms = query_attempt.execution_ms or 0
+
         return ExecuteQueryResponse(
             id=query_attempt.id,
             status=QueryStatus(query_attempt.status),
-            executed_at=query_attempt.executed_at.isoformat() + "Z",
-            execution_ms=query_attempt.execution_ms,
+            executed_at=executed_at_str,
+            execution_ms=execution_ms,
             results=QueryResults(
                 total_rows=result.total_rows,
                 page_size=500,
@@ -635,16 +664,18 @@ async def get_query_results(
         )
 
     # Authorization check
-    if query_attempt.user_id != user.id and user.role != 'admin':
+    if query_attempt.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access these results",
         )
 
     # Get results manifest
-    manifest = db.query(QueryResultsManifest).filter(
-        QueryResultsManifest.attempt_id == id
-    ).first()
+    manifest = (
+        db.query(QueryResultsManifest)
+        .filter(QueryResultsManifest.attempt_id == id)
+        .first()
+    )
 
     if not manifest:
         raise HTTPException(
@@ -661,13 +692,18 @@ async def get_query_results(
         )
 
     # Get results from JSON
+    if manifest.columns_json is None or manifest.results_json is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No results data available for query {id}.",
+        )
     columns = json.loads(manifest.columns_json)
     all_rows = json.loads(manifest.results_json)
 
     # Calculate pagination
     page_size = manifest.page_size
     offset = (page - 1) * page_size
-    page_rows = all_rows[offset:offset + page_size]
+    page_rows = all_rows[offset : offset + page_size]
 
     logger.info(
         f"GET /queries/{id}/results?page={page} - User {user.id} retrieved results"
@@ -675,7 +711,7 @@ async def get_query_results(
 
     return QueryResultsResponse(
         attempt_id=id,
-        total_rows=manifest.total_rows,
+        total_rows=manifest.total_rows or 0,
         page_size=page_size,
         page_count=page_count,
         current_page=page,
@@ -722,7 +758,7 @@ async def export_query_results(
         )
 
     # Authorization check
-    if query_attempt.user_id != user.id and user.role != 'admin':
+    if query_attempt.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to export these results",
@@ -800,7 +836,7 @@ async def rerun_query(
         )
 
     # Authorization check
-    if original_query.user_id != user.id and user.role != 'admin':
+    if original_query.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to re-run this query",
@@ -819,16 +855,15 @@ async def rerun_query(
         )
 
         # Update with original_attempt_id for lineage tracking
-        query_model = db.query(QueryAttempt).filter(
-            QueryAttempt.id == new_attempt.id
-        ).first()
-        query_model.original_attempt_id = id
-        db.commit()
-        db.refresh(query_model)
-
-        logger.info(
-            f"Query {id} re-run successfully, new attempt ID: {new_attempt.id}"
+        query_model = (
+            db.query(QueryAttempt).filter(QueryAttempt.id == new_attempt.id).first()
         )
+        if query_model:
+            query_model.original_attempt_id = id
+            db.commit()
+            db.refresh(query_model)
+
+        logger.info(f"Query {id} re-run successfully, new attempt ID: {new_attempt.id}")
 
         return RerunQueryResponse(
             id=new_attempt.id,

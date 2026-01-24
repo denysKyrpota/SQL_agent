@@ -23,6 +23,7 @@ from backend.app.schemas.auth import (
     SessionResponse,
     UserResponse,
 )
+from backend.app.schemas.common import UserRole
 from backend.app.services.auth_service import AuthenticationError, AuthService
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ async def login(
             user=UserResponse(
                 id=user.id,
                 username=user.username,
-                role=user.role,
+                role=UserRole(user.role),
                 active=user.active,
             ),
             session=SessionInfo(
@@ -154,9 +155,7 @@ async def login(
         200: {
             "description": "Logout successful",
             "content": {
-                "application/json": {
-                    "example": {"message": "Logged out successfully"}
-                }
+                "application/json": {"example": {"message": "Logged out successfully"}}
             },
         },
         401: {
@@ -287,11 +286,17 @@ async def validate_session(
 
     session = db.query(SessionModel).filter(SessionModel.token == session_token).first()
 
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session not found",
+        )
+
     return SessionResponse(
         user=UserResponse(
             id=user.id,
             username=user.username,
-            role=user.role,
+            role=UserRole(user.role),
             active=user.active,
         ),
         session=SessionInfoWithoutToken(

@@ -56,7 +56,9 @@ class SchemaService:
         logger.info("Loading PostgreSQL schema from JSON file")
 
         # Path to schema file
-        schema_file = Path("data/schema/all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json")
+        schema_file = Path(
+            "data/schema/all_in_one_schema_overview__tables__columns__pks__fks__descriptions.json"
+        )
 
         if not schema_file.exists():
             error_msg = f"Schema file not found: {schema_file}"
@@ -65,7 +67,7 @@ class SchemaService:
 
         try:
             # Load raw JSON data
-            with open(schema_file, 'r', encoding='utf-8') as f:
+            with open(schema_file, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
 
             logger.info(f"Loaded schema file with {len(raw_data)} rows")
@@ -143,7 +145,7 @@ class SchemaService:
                     "columns": [],
                     "primary_keys": [],
                     "foreign_keys": [],
-                    "description": row.get("table_description")
+                    "description": row.get("table_description"),
                 }
 
             table = tables[table_name]
@@ -153,7 +155,7 @@ class SchemaService:
                 "name": row.get("column_name"),
                 "type": row.get("data_type"),
                 "nullable": row.get("is_nullable", True),
-                "description": row.get("column_description")
+                "description": row.get("column_description"),
             }
             table["columns"].append(column_info)
 
@@ -166,7 +168,7 @@ class SchemaService:
                 fk_info = {
                     "column": row.get("column_name"),
                     "references_table": row.get("target_table"),
-                    "references_column": row.get("target_column")
+                    "references_column": row.get("target_column"),
                 }
                 # Avoid duplicates
                 if fk_info not in table["foreign_keys"]:
@@ -175,10 +177,7 @@ class SchemaService:
         # Create sorted list of table names
         table_names = sorted(tables.keys())
 
-        return {
-            "tables": tables,
-            "table_names": table_names
-        }
+        return {"tables": tables, "table_names": table_names}
 
     def get_schema(self) -> dict[str, Any]:
         """
@@ -242,9 +241,7 @@ class SchemaService:
         # Log warning if any requested tables not found
         missing_tables = set(table_names) - set(filtered_tables.keys())
         if missing_tables:
-            logger.warning(
-                f"Requested tables not found in schema: {missing_tables}"
-            )
+            logger.warning(f"Requested tables not found in schema: {missing_tables}")
 
         logger.info(
             f"Filtered schema: {len(filtered_tables)} tables out of "
@@ -253,14 +250,14 @@ class SchemaService:
 
         return {
             "tables": filtered_tables,
-            "table_names": sorted(filtered_tables.keys())
+            "table_names": sorted(filtered_tables.keys()),
         }
 
     def format_schema_for_llm(
         self,
         schema: dict[str, Any],
         include_descriptions: bool = True,
-        include_foreign_keys: bool = True
+        include_foreign_keys: bool = True,
     ) -> str:
         """
         Format schema as readable text for LLM consumption.
@@ -380,12 +377,9 @@ class SchemaService:
         keyword_lower = keyword.lower()
 
         matching_tables = [
-            name for name in schema["table_names"]
-            if keyword_lower in name.lower()
+            name for name in schema["table_names"] if keyword_lower in name.lower()
         ]
 
-        logger.info(
-            f"Search for '{keyword}' found {len(matching_tables)} tables"
-        )
+        logger.info(f"Search for '{keyword}' found {len(matching_tables)} tables")
 
         return matching_tables

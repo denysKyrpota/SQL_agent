@@ -31,7 +31,7 @@ class QueryService:
         self,
         llm_service: LLMService | None = None,
         schema_service: SchemaService | None = None,
-        kb_service: KnowledgeBaseService | None = None
+        kb_service: KnowledgeBaseService | None = None,
     ):
         """
         Initialize the query service with dependencies.
@@ -147,13 +147,23 @@ class QueryService:
                 )
 
             # Step 4: Return response
+            # Note: created_at is always set, but mypy needs assurance
+            created_at_str = (
+                query_attempt.created_at.isoformat() + "Z"
+                if query_attempt.created_at
+                else datetime.utcnow().isoformat() + "Z"
+            )
             return QueryAttemptResponse(
                 id=query_attempt.id,
                 natural_language_query=query_attempt.natural_language_query,
                 generated_sql=query_attempt.generated_sql,
                 status=QueryStatus(query_attempt.status),
-                created_at=query_attempt.created_at.isoformat() + "Z" if query_attempt.created_at else None,
-                generated_at=query_attempt.generated_at.isoformat() + "Z" if query_attempt.generated_at else None,
+                created_at=created_at_str,
+                generated_at=(
+                    query_attempt.generated_at.isoformat() + "Z"
+                    if query_attempt.generated_at
+                    else None
+                ),
                 generation_ms=query_attempt.generation_ms,
                 error_message=query_attempt.error_message,
             )
@@ -191,7 +201,7 @@ class QueryService:
             natural_language_query=natural_language_query,
             generated_sql=None,
             status=QueryStatus.NOT_EXECUTED.value,
-            created_at=datetime.fromisoformat(created_at.replace('Z', '+00:00')),
+            created_at=datetime.fromisoformat(created_at.replace("Z", "+00:00")),
             generated_at=None,
             generation_ms=None,
             error_message=None,
@@ -205,9 +215,7 @@ class QueryService:
 
         return query_attempt
 
-    async def _generate_sql(
-        self, natural_language_query: str, user_id: int
-    ) -> str:
+    async def _generate_sql(self, natural_language_query: str, user_id: int) -> str:
         """
         Generate SQL from natural language query using two-stage process.
 
@@ -237,9 +245,7 @@ class QueryService:
             logger.debug(f"Total tables available: {len(table_names)}")
 
             selected_tables = await self.llm.select_relevant_tables(
-                table_names=table_names,
-                question=natural_language_query,
-                max_tables=10
+                table_names=table_names, question=natural_language_query, max_tables=10
             )
 
             logger.info(
@@ -249,24 +255,26 @@ class QueryService:
             # Filter schema to selected tables
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
             schema_text = self.schema.format_schema_for_llm(
-                filtered_schema,
-                include_descriptions=True,
-                include_foreign_keys=True
+                filtered_schema, include_descriptions=True, include_foreign_keys=True
             )
 
             logger.debug(f"Filtered schema size: {len(schema_text)} characters")
 
             # Stage 2: Generate question embedding and find similar KB examples
-            logger.info("Stage 2: Generating question embedding and finding similar examples")
+            logger.info(
+                "Stage 2: Generating question embedding and finding similar examples"
+            )
 
             # Generate embedding for the user's question
-            question_embedding = await self.llm.generate_embedding(natural_language_query)
+            question_embedding = await self.llm.generate_embedding(
+                natural_language_query
+            )
 
             # Find similar examples using embedding-based search
             kb_examples, max_similarity = await self.kb.find_similar_examples(
                 question=natural_language_query,
                 question_embedding=question_embedding,
-                top_k=3
+                top_k=3,
             )
 
             logger.info(
@@ -284,17 +292,19 @@ class QueryService:
 
             # Stage 3: Generate SQL using LLM if no exact match
             example_sqls = [ex.sql for ex in kb_examples]
-            logger.info(f"No exact match. Generating SQL with LLM using {len(example_sqls)} examples as context")
+            logger.info(
+                f"No exact match. Generating SQL with LLM using {len(example_sqls)} examples as context"
+            )
 
             generated_sql = await self.llm.generate_sql(
                 question=natural_language_query,
                 schema_text=schema_text,
-                examples=example_sqls
+                examples=example_sqls,
             )
 
             logger.info(
                 f"SQL generation complete: {len(generated_sql)} characters",
-                extra={"sql_length": len(generated_sql)}
+                extra={"sql_length": len(generated_sql)},
             )
 
             return generated_sql
@@ -335,9 +345,11 @@ class QueryService:
             Updated QueryAttemptModel object
         """
         # Get query attempt
-        query_attempt = db.query(QueryAttemptModel).filter(
-            QueryAttemptModel.id == attempt_id
-        ).first()
+        query_attempt = (
+            db.query(QueryAttemptModel)
+            .filter(QueryAttemptModel.id == attempt_id)
+            .first()
+        )
 
         if not query_attempt:
             raise ValueError(f"Query attempt {attempt_id} not found")
@@ -376,9 +388,11 @@ class QueryService:
             Updated QueryAttemptModel object
         """
         # Get query attempt
-        query_attempt = db.query(QueryAttemptModel).filter(
-            QueryAttemptModel.id == attempt_id
-        ).first()
+        query_attempt = (
+            db.query(QueryAttemptModel)
+            .filter(QueryAttemptModel.id == attempt_id)
+            .first()
+        )
 
         if not query_attempt:
             raise ValueError(f"Query attempt {attempt_id} not found")

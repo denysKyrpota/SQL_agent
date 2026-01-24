@@ -25,8 +25,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/embeddings/generate")
 async def generate_embeddings(
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     """
     Generate embeddings for all knowledge base examples.
@@ -48,8 +47,7 @@ async def generate_embeddings(
     # Check if user is admin
     if user.get("role") != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="Only admins can generate embeddings"
+            status_code=403, detail="Only admins can generate embeddings"
         )
 
     logger.info(
@@ -66,31 +64,29 @@ async def generate_embeddings(
 
         logger.info(
             f"Embedding generation complete: {stats}",
-            extra={"admin_user_id": user["id"], "stats": stats}
+            extra={"admin_user_id": user["id"], "stats": stats},
         )
 
         return {
             "success": True,
             "message": "Embeddings generated successfully",
-            "stats": stats
+            "stats": stats,
         }
 
     except Exception as e:
         logger.error(
             f"Failed to generate embeddings: {e}",
             extra={"admin_user_id": user["id"]},
-            exc_info=True
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate embeddings: {str(e)}"
+            status_code=500, detail=f"Failed to generate embeddings: {str(e)}"
         )
 
 
 @router.post("/schema/refresh")
 async def refresh_schema(
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     """
     Refresh the database schema cache.
@@ -105,14 +101,9 @@ async def refresh_schema(
     """
     # Check if user is admin
     if user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only admins can refresh schema"
-        )
+        raise HTTPException(status_code=403, detail="Only admins can refresh schema")
 
-    logger.info(
-        f"Admin {user['username']} (ID: {user['id']}) requested schema refresh"
-    )
+    logger.info(f"Admin {user['username']} (ID: {user['id']}) requested schema refresh")
 
     try:
         schema_service = SchemaService()
@@ -120,36 +111,34 @@ async def refresh_schema(
 
         stats = {
             "total_tables": len(schema["tables"]),
-            "total_columns": sum(len(t["columns"]) for t in schema["tables"].values())
+            "total_columns": sum(len(t["columns"]) for t in schema["tables"].values()),
         }
 
         logger.info(
             f"Schema refreshed: {stats}",
-            extra={"admin_user_id": user["id"], "stats": stats}
+            extra={"admin_user_id": user["id"], "stats": stats},
         )
 
         return {
             "success": True,
             "message": "Schema refreshed successfully",
-            "stats": stats
+            "stats": stats,
         }
 
     except Exception as e:
         logger.error(
             f"Failed to refresh schema: {e}",
             extra={"admin_user_id": user["id"]},
-            exc_info=True
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to refresh schema: {str(e)}"
+            status_code=500, detail=f"Failed to refresh schema: {str(e)}"
         )
 
 
 @router.post("/kb/refresh")
 async def refresh_knowledge_base(
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     """
     Refresh the knowledge base cache.
@@ -165,13 +154,10 @@ async def refresh_knowledge_base(
     # Check if user is admin
     if user.get("role") != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="Only admins can refresh knowledge base"
+            status_code=403, detail="Only admins can refresh knowledge base"
         )
 
-    logger.info(
-        f"Admin {user['username']} (ID: {user['id']}) requested KB refresh"
-    )
+    logger.info(f"Admin {user['username']} (ID: {user['id']}) requested KB refresh")
 
     try:
         kb_service = KnowledgeBaseService()
@@ -181,31 +167,29 @@ async def refresh_knowledge_base(
 
         logger.info(
             f"Knowledge base refreshed: {stats}",
-            extra={"admin_user_id": user["id"], "stats": stats}
+            extra={"admin_user_id": user["id"], "stats": stats},
         )
 
         return {
             "success": True,
             "message": "Knowledge base refreshed successfully",
-            "stats": stats
+            "stats": stats,
         }
 
     except Exception as e:
         logger.error(
             f"Failed to refresh knowledge base: {e}",
             extra={"admin_user_id": user["id"]},
-            exc_info=True
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to refresh knowledge base: {str(e)}"
+            status_code=500, detail=f"Failed to refresh knowledge base: {str(e)}"
         )
 
 
 @router.get("/kb/stats")
 async def get_kb_stats(
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> dict[str, Any]:
     """
     Get knowledge base statistics.
@@ -222,10 +206,7 @@ async def get_kb_stats(
     """
     # Check if user is admin
     if user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only admins can view KB stats"
-        )
+        raise HTTPException(status_code=403, detail="Only admins can view KB stats")
 
     try:
         kb_service = KnowledgeBaseService()
@@ -244,9 +225,6 @@ async def get_kb_stats(
         logger.error(
             f"Failed to get KB stats: {e}",
             extra={"admin_user_id": user["id"]},
-            exc_info=True
+            exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get KB stats: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get KB stats: {str(e)}")

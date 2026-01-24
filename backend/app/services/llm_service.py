@@ -11,7 +11,13 @@ import logging
 import re
 from typing import Any
 
-from openai import AsyncOpenAI, AsyncAzureOpenAI, RateLimitError, APIError, APIConnectionError
+from openai import (
+    AsyncOpenAI,
+    AsyncAzureOpenAI,
+    RateLimitError,
+    APIError,
+    APIConnectionError,
+)
 
 from backend.app.config import get_settings
 
@@ -31,7 +37,9 @@ class LLMService:
     def __init__(self):
         """Initialize the LLM service with OpenAI or Azure OpenAI client."""
         self.is_azure = settings.use_azure_openai
-        self._azure_supports_temperature = True  # Will be set to False if we detect it's not supported
+        self._azure_supports_temperature = (
+            True  # Will be set to False if we detect it's not supported
+        )
 
         if self.is_azure:
             # Azure OpenAI configuration
@@ -42,11 +50,16 @@ class LLMService:
                 self.client = AsyncAzureOpenAI(
                     azure_endpoint=settings.azure_openai_endpoint,
                     api_key=settings.azure_openai_api_key,
-                    api_version=settings.azure_openai_api_version
+                    api_version=settings.azure_openai_api_version,
                 )
                 self.model = settings.azure_openai_deployment
-                self.embedding_model = settings.azure_openai_embedding_deployment or settings.azure_openai_deployment
-                logger.info(f"LLM Service initialized with Azure OpenAI deployment: {self.model}")
+                self.embedding_model = (
+                    settings.azure_openai_embedding_deployment
+                    or settings.azure_openai_deployment
+                )
+                logger.info(
+                    f"LLM Service initialized with Azure OpenAI deployment: {self.model}"
+                )
         else:
             # Standard OpenAI configuration
             self.model = settings.openai_model
@@ -63,7 +76,7 @@ class LLMService:
         table_names: list[str],
         question: str,
         max_tables: int = 10,
-        conversation_history: list[dict[str, str]] | None = None
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> list[str]:
         """
         Stage 1: Select relevant tables from full table list.
@@ -110,7 +123,7 @@ class LLMService:
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful database expert. Return only table names, comma-separated, no explanations."
+                "content": "You are a helpful database expert. Return only table names, comma-separated, no explanations.",
             }
         ]
 
@@ -119,10 +132,7 @@ class LLMService:
             messages.extend(conversation_history)
 
         # Add current user prompt
-        messages.append({
-            "role": "user",
-            "content": prompt
-        })
+        messages.append({"role": "user", "content": prompt})
 
         # Call OpenAI with retry logic - try up to 3 times if we get empty/invalid response
         response_text = ""
@@ -134,18 +144,22 @@ class LLMService:
                 response_text = await self._call_openai_with_retry(
                     messages=messages,
                     max_tokens=500,  # Table names only, should be short
-                    temperature=0.0  # Deterministic selection
+                    temperature=0.0,  # Deterministic selection
                 )
 
                 if not response_text or not response_text.strip():
-                    logger.warning(f"LLM returned empty response for table selection (attempt {attempt + 1}/3)")
+                    logger.warning(
+                        f"LLM returned empty response for table selection (attempt {attempt + 1}/3)"
+                    )
                     if attempt < 2:
                         await asyncio.sleep(1.0)  # Brief pause before retry
                     continue
 
                 # Parse table names from response
                 # Log the full response for debugging (up to 1000 chars)
-                logger.info(f"Stage 1 raw LLM response (attempt {attempt + 1}): {response_text[:1000]}")
+                logger.info(
+                    f"Stage 1 raw LLM response (attempt {attempt + 1}): {response_text[:1000]}"
+                )
                 selected_tables = self._parse_table_names(response_text, table_names)
 
                 if selected_tables:
@@ -153,7 +167,9 @@ class LLMService:
 
             except ValueError as e:
                 last_error = e
-                logger.warning(f"Table selection parsing failed (attempt {attempt + 1}/3): {e}")
+                logger.warning(
+                    f"Table selection parsing failed (attempt {attempt + 1}/3): {e}"
+                )
                 if attempt < 2:
                     await asyncio.sleep(1.0)  # Brief pause before retry
                 continue
@@ -161,7 +177,9 @@ class LLMService:
         # Handle failure after all retries
         if not selected_tables:
             error_detail = f" Last error: {last_error}" if last_error else ""
-            logger.error(f"Failed to select tables after 3 attempts for question: {question}.{error_detail}")
+            logger.error(
+                f"Failed to select tables after 3 attempts for question: {question}.{error_detail}"
+            )
             raise ValueError(
                 f"Could not identify relevant tables for your question. "
                 f"This database contains logistics/transportation data (activities, drivers, vehicles, customers, contracts). "
@@ -179,7 +197,7 @@ class LLMService:
         table_names: list[str],
         question: str,
         max_tables: int,
-        conversation_history: list[dict[str, str]] | None = None
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> str:
         """
         Build prompt for Stage 1: Table selection.
@@ -198,7 +216,9 @@ class LLMService:
 
         context_note = ""
         if conversation_history:
-            context_note = "\nNote: Consider the conversation history above when selecting tables."
+            context_note = (
+                "\nNote: Consider the conversation history above when selecting tables."
+            )
 
         prompt = f"""Given these database tables for a logistics company:
 {tables_list}
@@ -221,7 +241,7 @@ Example: activity_activity, asset_truck, asset_assignment"""
         question: str,
         schema_text: str,
         examples: list[str],
-        conversation_history: list[dict[str, str]] | None = None
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> str:
         """
         Stage 2: Generate SQL query using filtered schema and examples.
@@ -268,7 +288,7 @@ Example: activity_activity, asset_truck, asset_assignment"""
                 "content": (
                     "You are a PostgreSQL expert. Generate SELECT queries based on the schema provided. "
                     "Return only the SQL query, no explanations or markdown."
-                )
+                ),
             }
         ]
 
@@ -277,20 +297,19 @@ Example: activity_activity, asset_truck, asset_assignment"""
             messages.extend(conversation_history)
 
         # Add current user prompt
-        messages.append({
-            "role": "user",
-            "content": prompt
-        })
+        messages.append({"role": "user", "content": prompt})
 
         # Call OpenAI with retry logic using few-shot examples to reinforce SELECT-only behavior
         response_text = await self._call_openai_with_retry(
             messages=messages,
             max_tokens=settings.openai_max_tokens,
-            temperature=settings.openai_temperature
+            temperature=settings.openai_temperature,
         )
 
         # Log raw response for debugging
-        logger.info(f"Stage 2 raw LLM response: {response_text[:1500] if response_text else 'EMPTY'}")
+        logger.info(
+            f"Stage 2 raw LLM response: {response_text[:1500] if response_text else 'EMPTY'}"
+        )
 
         # Extract SQL from response
         sql = self._extract_sql_from_response(response_text)
@@ -305,7 +324,7 @@ Example: activity_activity, asset_truck, asset_assignment"""
         question: str,
         schema_text: str,
         examples: list[str],
-        conversation_history: list[dict[str, str]] | None = None
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> str:
         """
         Build prompt for Stage 2: SQL generation.
@@ -353,7 +372,7 @@ Return only the SQL, no explanations."""
         messages: list[dict[str, str]],
         max_tokens: int = 1000,
         temperature: float = 0.0,
-        max_retries: int = 3
+        max_retries: int = 3,
     ) -> str:
         """
         Call OpenAI API with exponential backoff retry logic.
@@ -412,7 +431,7 @@ Return only the SQL, no explanations."""
 
             except RateLimitError as e:
                 # Rate limit hit - use exponential backoff
-                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                wait_time = 2**attempt  # 1s, 2s, 4s
                 logger.warning(
                     f"Rate limit hit (attempt {attempt + 1}). "
                     f"Waiting {wait_time}s before retry. Error: {e}"
@@ -426,7 +445,7 @@ Return only the SQL, no explanations."""
 
             except APIConnectionError as e:
                 # Network error - retry
-                wait_time = 2 ** attempt
+                wait_time = 2**attempt
                 logger.warning(
                     f"API connection error (attempt {attempt + 1}). "
                     f"Waiting {wait_time}s before retry. Error: {e}"
@@ -442,7 +461,11 @@ Return only the SQL, no explanations."""
                 error_str = str(e)
 
                 # Check if this is a "temperature not supported" error from Azure
-                if self.is_azure and "temperature" in error_str.lower() and "unsupported" in error_str.lower():
+                if (
+                    self.is_azure
+                    and "temperature" in error_str.lower()
+                    and "unsupported" in error_str.lower()
+                ):
                     logger.warning(
                         f"Azure deployment does not support temperature parameter. "
                         f"Disabling temperature and retrying. This may result in less deterministic responses."
@@ -456,24 +479,18 @@ Return only the SQL, no explanations."""
                 if attempt < max_retries - 1:
                     await asyncio.sleep(1)
                 else:
-                    raise LLMServiceUnavailableError(
-                        f"OpenAI API error: {e}"
-                    ) from e
+                    raise LLMServiceUnavailableError(f"OpenAI API error: {e}") from e
 
             except Exception as e:
                 # Unexpected error - don't retry
                 logger.error(f"Unexpected error calling OpenAI: {e}", exc_info=True)
-                raise LLMServiceUnavailableError(
-                    f"Unexpected error: {e}"
-                ) from e
+                raise LLMServiceUnavailableError(f"Unexpected error: {e}") from e
 
         # Should never reach here
         raise LLMServiceUnavailableError("Maximum retries exceeded")
 
     def _parse_table_names(
-        self,
-        response_text: str,
-        valid_table_names: list[str]
+        self, response_text: str, valid_table_names: list[str]
     ) -> list[str]:
         """
         Parse table names from LLM response.
@@ -497,20 +514,47 @@ Return only the SQL, no explanations."""
 
         # Check for refusal patterns that indicate LLM didn't understand
         refusal_patterns = [
-            "i cannot", "i can't", "i don't know", "i'm not sure",
-            "unable to", "no tables", "not possible", "cannot determine",
-            "insufficient information", "need more context"
+            "i cannot",
+            "i can't",
+            "i don't know",
+            "i'm not sure",
+            "unable to",
+            "no tables",
+            "not possible",
+            "cannot determine",
+            "insufficient information",
+            "need more context",
         ]
         if any(pattern in cleaned.lower() for pattern in refusal_patterns):
-            logger.warning(f"LLM appears to have refused or been uncertain: {cleaned[:200]}")
+            logger.warning(
+                f"LLM appears to have refused or been uncertain: {cleaned[:200]}"
+            )
             raise ValueError(f"LLM could not determine tables: {cleaned[:100]}")
 
         # Remove common prefixes/suffixes and markdown formatting
-        for remove_str in ["```", "sql", "SELECT", "FROM", "*", "-", "•", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10."]:
+        for remove_str in [
+            "```",
+            "sql",
+            "SELECT",
+            "FROM",
+            "*",
+            "-",
+            "•",
+            "1.",
+            "2.",
+            "3.",
+            "4.",
+            "5.",
+            "6.",
+            "7.",
+            "8.",
+            "9.",
+            "10.",
+        ]:
             cleaned = cleaned.replace(remove_str, " ")
 
         # Remove numbered list patterns like "1) " or "1. "
-        cleaned = re.sub(r'\d+[\.\)]\s*', ' ', cleaned)
+        cleaned = re.sub(r"\d+[\.\)]\s*", " ", cleaned)
 
         # Build a map of valid table names (case-insensitive)
         valid_table_names_lower = {name.lower(): name for name in valid_table_names}
@@ -520,7 +564,7 @@ Return only the SQL, no explanations."""
         validated = []
         for valid_name_lower, valid_name in valid_table_names_lower.items():
             # Look for the table name as a whole word
-            pattern = rf'\b{re.escape(valid_name_lower)}\b'
+            pattern = rf"\b{re.escape(valid_name_lower)}\b"
             if re.search(pattern, cleaned.lower()):
                 if valid_name not in validated:
                     validated.append(valid_name)
@@ -624,8 +668,8 @@ Return only the SQL, no explanations."""
         if not (cleaned_upper.startswith("SELECT") or cleaned_upper.startswith("WITH")):
             # Try to find SELECT or WITH statement in the response
             # Look for SELECT or WITH at the start of a line
-            select_match = re.search(r'(?:^|\n)(SELECT\s)', cleaned, re.IGNORECASE)
-            with_match = re.search(r'(?:^|\n)(WITH\s)', cleaned, re.IGNORECASE)
+            select_match = re.search(r"(?:^|\n)(SELECT\s)", cleaned, re.IGNORECASE)
+            with_match = re.search(r"(?:^|\n)(WITH\s)", cleaned, re.IGNORECASE)
 
             if select_match:
                 start_pos = select_match.start(1)
@@ -651,20 +695,32 @@ Return only the SQL, no explanations."""
 
         # Check for dangerous commands - use word boundary matching to avoid false positives
         # with column names like "created_at" or table names containing these words
-        dangerous_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]
+        dangerous_keywords = [
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "CREATE",
+            "ALTER",
+            "TRUNCATE",
+        ]
         for keyword in dangerous_keywords:
             # Match as a standalone word (not part of column/table names)
             # Pattern: keyword followed by whitespace or common SQL tokens
-            pattern = rf'\b{keyword}\s+(TABLE|INTO|FROM|SET|DATABASE|SCHEMA|INDEX|VIEW|TRIGGER|FUNCTION|PROCEDURE|\()'
+            pattern = rf"\b{keyword}\s+(TABLE|INTO|FROM|SET|DATABASE|SCHEMA|INDEX|VIEW|TRIGGER|FUNCTION|PROCEDURE|\()"
             if re.search(pattern, cleaned_upper):
-                logger.error(f"Response contains dangerous keyword '{keyword}' in DDL/DML context")
+                logger.error(
+                    f"Response contains dangerous keyword '{keyword}' in DDL/DML context"
+                )
                 raise ValueError(
                     f"The AI attempted to generate a {keyword} operation, which is not allowed. "
                     f"This system only supports SELECT queries to read data, not modify it. "
                     f"Please rephrase your question to ask about existing data (e.g., 'Show me customers that were created...' instead of 'Create customers...')."
                 )
             # Also check for the keyword at the start of a statement
-            elif cleaned_upper.strip().startswith(keyword + " ") or cleaned_upper.strip().startswith(keyword + "\n"):
+            elif cleaned_upper.strip().startswith(
+                keyword + " "
+            ) or cleaned_upper.strip().startswith(keyword + "\n"):
                 logger.error(f"Response starts with dangerous keyword '{keyword}'")
                 raise ValueError(
                     f"The AI attempted to generate a {keyword} operation, which is not allowed. "
@@ -703,8 +759,7 @@ Return only the SQL, no explanations."""
 
         try:
             response = await self.client.embeddings.create(
-                model=self.embedding_model,
-                input=text
+                model=self.embedding_model, input=text
             )
 
             embedding = response.data[0].embedding
@@ -725,9 +780,11 @@ Return only the SQL, no explanations."""
 
 class LLMServiceUnavailableError(Exception):
     """Raised when OpenAI API is unavailable after retries."""
+
     pass
 
 
 class SQLGenerationError(Exception):
     """Raised when SQL generation fails (invalid response, etc.)."""
+
     pass

@@ -58,9 +58,9 @@ chat_service = ChatService()
     },
 )
 async def create_conversation(
-    request: CreateConversationRequest | None = None,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    request: CreateConversationRequest | None = None,
 ):
     """
     Create a new conversation thread.
@@ -95,8 +95,8 @@ async def create_conversation(
 async def list_conversations(
     page: int = 1,
     page_size: int = 20,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     List all conversations for the authenticated user with pagination.
@@ -144,8 +144,8 @@ async def list_conversations(
 )
 async def get_conversation_messages(
     conversation_id: int,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get all messages in a conversation.
@@ -193,8 +193,8 @@ async def get_conversation_messages(
 )
 async def send_message(
     request: SendMessageRequest,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Send a message in a conversation and receive AI-generated response with SQL.
@@ -256,9 +256,9 @@ async def send_message(
 )
 async def regenerate_message(
     message_id: int,
-    request: RegenerateMessageRequest = None,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    request: RegenerateMessageRequest | None = None,
 ):
     """
     Regenerate an assistant message (creates new message with is_regenerated=True).
@@ -320,8 +320,8 @@ async def regenerate_message(
 async def edit_message(
     message_id: int,
     request: EditMessageRequest,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Edit a user message (creates new message with is_edited=True).

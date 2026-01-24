@@ -19,11 +19,7 @@ class CreateConversationRequest(BaseModel):
     )
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "Customer Analytics Queries"
-            }
-        }
+        json_schema_extra = {"example": {"title": "Customer Analytics Queries"}}
 
 
 class ConversationResponse(BaseModel):
@@ -35,7 +31,9 @@ class ConversationResponse(BaseModel):
     is_active: bool = Field(description="Whether conversation is active")
     created_at: str = Field(description="ISO 8601 timestamp when created")
     updated_at: str = Field(description="ISO 8601 timestamp when last updated")
-    message_count: int = Field(default=0, description="Number of messages in conversation")
+    message_count: int = Field(
+        default=0, description="Number of messages in conversation"
+    )
 
     class Config:
         from_attributes = True
@@ -93,24 +91,21 @@ class MessageResponse(BaseModel):
     content: str = Field(description="Message content")
     query_attempt_id: int | None = Field(
         default=None,
-        description="Query attempt ID if SQL was generated in this message"
+        description="Query attempt ID if SQL was generated in this message",
     )
     parent_message_id: int | None = Field(
         default=None,
-        description="Parent message ID if this is an edited or regenerated message"
+        description="Parent message ID if this is an edited or regenerated message",
     )
     is_edited: bool = Field(
-        default=False,
-        description="Whether this message was edited"
+        default=False, description="Whether this message was edited"
     )
     is_regenerated: bool = Field(
-        default=False,
-        description="Whether this message was regenerated"
+        default=False, description="Whether this message was regenerated"
     )
     created_at: str = Field(description="ISO 8601 timestamp when created")
     metadata: dict[str, Any] | None = Field(
-        default=None,
-        description="Additional metadata (e.g., token count, model)"
+        default=None, description="Additional metadata (e.g., token count, model)"
     )
 
     class Config:
@@ -134,14 +129,9 @@ class MessageResponse(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request payload for sending a message in a conversation."""
 
-    content: str = Field(
-        min_length=1,
-        max_length=5000,
-        description="Message content"
-    )
+    content: str = Field(min_length=1, max_length=5000, description="Message content")
     conversation_id: int | None = Field(
-        default=None,
-        description="Conversation ID (if None, creates new conversation)"
+        default=None, description="Conversation ID (if None, creates new conversation)"
     )
 
     @field_validator("content")
@@ -238,9 +228,7 @@ class EditMessageRequest(BaseModel):
     """Request payload for editing a user message."""
 
     content: str = Field(
-        min_length=1,
-        max_length=5000,
-        description="New message content"
+        min_length=1, max_length=5000, description="New message content"
     )
 
     @field_validator("content")
@@ -253,7 +241,5 @@ class EditMessageRequest(BaseModel):
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "content": "Show me all active customers from the last 30 days"
-            }
+            "example": {"content": "Show me all active customers from the last 30 days"}
         }

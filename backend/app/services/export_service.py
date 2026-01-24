@@ -36,9 +36,7 @@ class ExportService:
         logger.info(f"Export service initialized (max rows: {max_rows})")
 
     async def export_to_csv(
-        self,
-        db: Session,
-        query_attempt_id: int
+        self, db: Session, query_attempt_id: int
     ) -> StreamingResponse:
         """
         Export query results as CSV file.
@@ -61,17 +59,19 @@ class ExportService:
         logger.info(f"Exporting query attempt {query_attempt_id} to CSV")
 
         # Get query attempt
-        query_attempt = db.query(QueryAttempt).filter(
-            QueryAttempt.id == query_attempt_id
-        ).first()
+        query_attempt = (
+            db.query(QueryAttempt).filter(QueryAttempt.id == query_attempt_id).first()
+        )
 
         if not query_attempt:
             raise ValueError(f"Query attempt {query_attempt_id} not found")
 
         # Get results manifest
-        manifest = db.query(QueryResultsManifest).filter(
-            QueryResultsManifest.attempt_id == query_attempt_id
-        ).first()
+        manifest = (
+            db.query(QueryResultsManifest)
+            .filter(QueryResultsManifest.attempt_id == query_attempt_id)
+            .first()
+        )
 
         if not manifest:
             raise ValueError(
@@ -80,7 +80,7 @@ class ExportService:
             )
 
         # Check size limit
-        if manifest.total_rows > self.max_rows:
+        if manifest.total_rows is not None and manifest.total_rows > self.max_rows:
             raise ExportTooLargeError(
                 f"Result set too large to export: {manifest.total_rows} rows. "
                 f"Maximum is {self.max_rows} rows. "
@@ -88,15 +88,19 @@ class ExportService:
             )
 
         # Load results
+        if manifest.columns_json is None or manifest.results_json is None:
+            raise ValueError(
+                f"No results data available for query {query_attempt_id}."
+            )
         columns = json.loads(manifest.columns_json)
         rows = json.loads(manifest.results_json)
 
-        logger.info(
-            f"Exporting {manifest.total_rows} rows × {len(columns)} columns"
-        )
+        logger.info(f"Exporting {manifest.total_rows} rows × {len(columns)} columns")
 
         # Generate filename
-        filename = f"query_{query_attempt_id}_{int(query_attempt.created_at.timestamp())}.csv"
+        filename = (
+            f"query_{query_attempt_id}_{int(query_attempt.created_at.timestamp())}.csv"
+        )
 
         # Create streaming response
         return StreamingResponse(
@@ -104,14 +108,12 @@ class ExportService:
             media_type="text/csv",
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
-                "Cache-Control": "no-cache"
-            }
+                "Cache-Control": "no-cache",
+            },
         )
 
     def _generate_csv_stream(
-        self,
-        columns: list[str],
-        rows: list[list[Any]]
+        self, columns: list[str], rows: list[list[Any]]
     ) -> Generator[str, None, None]:
         """
         Generate CSV content as a stream.
@@ -127,11 +129,7 @@ class ExportService:
         """
         # Create string buffer
         output = io.StringIO()
-        writer = csv.writer(
-            output,
-            quoting=csv.QUOTE_MINIMAL,
-            lineterminator='\n'
-        )
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
 
         # Write header
         writer.writerow(columns)
@@ -184,9 +182,7 @@ class ExportService:
         return str(value)
 
     async def get_export_info(
-        self,
-        db: Session,
-        query_attempt_id: int
+        self, db: Session, query_attempt_id: int
     ) -> dict[str, Any]:
         """
         Get information about exportability of a query.
@@ -211,42 +207,47 @@ class ExportService:
                 "warning": None
             }
         """
-        manifest = db.query(QueryResultsManifest).filter(
-            QueryResultsManifest.attempt_id == query_attempt_id
-        ).first()
+        manifest = (
+            db.query(QueryResultsManifest)
+            .filter(QueryResultsManifest.attempt_id == query_attempt_id)
+            .first()
+        )
 
         if not manifest:
-            return {
-                "exportable": False,
-                "error": "No results available"
-            }
+            return {"exportable": False, "error": "No results available"}
+
+        if manifest.columns_json is None or manifest.results_json is None:
+            return {"exportable": False, "error": "No results data available"}
 
         columns = json.loads(manifest.columns_json)
         rows = json.loads(manifest.results_json)
 
+        total_rows = manifest.total_rows or 0
+
         # Estimate CSV size (rough approximation)
         # Assume average 20 bytes per cell
-        estimated_size_bytes = manifest.total_rows * len(columns) * 20
+        estimated_size_bytes = total_rows * len(columns) * 20
         estimated_size_mb = estimated_size_bytes / (1024 * 1024)
 
-        exportable = manifest.total_rows <= self.max_rows
+        exportable = total_rows <= self.max_rows
 
         warning = None
-        if manifest.total_rows > self.max_rows:
+        if total_rows > self.max_rows:
             warning = (
-                f"Result set is too large ({manifest.total_rows} rows). "
+                f"Result set is too large ({total_rows} rows). "
                 f"Maximum is {self.max_rows} rows. Please add filters."
             )
 
         return {
             "exportable": exportable,
-            "total_rows": manifest.total_rows,
+            "total_rows": total_rows,
             "total_columns": len(columns),
             "estimated_size_mb": round(estimated_size_mb, 2),
-            "warning": warning
+            "warning": warning,
         }
 
 
 class ExportTooLargeError(Exception):
     """Raised when export exceeds size limits."""
+
     pass

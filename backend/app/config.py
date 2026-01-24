@@ -93,7 +93,11 @@ class Settings(BaseSettings):
     @property
     def use_azure_openai(self) -> bool:
         """Check if Azure OpenAI is configured."""
-        return bool(self.azure_openai_endpoint and self.azure_openai_api_key and self.azure_openai_deployment)
+        return bool(
+            self.azure_openai_endpoint
+            and self.azure_openai_api_key
+            and self.azure_openai_deployment
+        )
 
     # =========================================================================
     # Authentication Configuration
@@ -128,7 +132,11 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Parse CORS origins from comma-separated string to list."""
-        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
+        return [
+            origin.strip()
+            for origin in self.cors_origins_str.split(",")
+            if origin.strip()
+        ]
 
     # =========================================================================
     # Rate Limiting Configuration
