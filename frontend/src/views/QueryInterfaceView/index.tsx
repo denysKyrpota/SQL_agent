@@ -93,12 +93,7 @@ const QueryInterfaceView: React.FC = () => {
 
   // Handle query submission - Now uses chat service
   const handleSubmit = async () => {
-    // Enable chat mode when user submits first query
-    if (!chatOpen) {
-      setChatOpen(true);
-    }
-
-    // Clear previous state
+    // Set loading state first (keep form visible with loading indicator)
     setQueryState(prev => ({
       ...prev,
       error: null,
@@ -121,6 +116,11 @@ const QueryInterfaceView: React.FC = () => {
         setConversationId(response.conversation_id);
       }
 
+      // Enable chat mode after successful generation
+      if (!chatOpen) {
+        setChatOpen(true);
+      }
+
       // Clear input and saved state
       setQueryState(prev => ({
         ...prev,
@@ -134,6 +134,11 @@ const QueryInterfaceView: React.FC = () => {
 
     } catch (error) {
       console.error('Query submission error:', error);
+
+      // Switch to chat mode even on error so user can see error and retry
+      if (!chatOpen) {
+        setChatOpen(true);
+      }
 
       let errorType: 'generation' | 'network' = 'generation';
       let errorMessage = 'An unexpected error occurred';
@@ -481,6 +486,10 @@ const QueryInterfaceView: React.FC = () => {
                   disabled={queryState.isGenerating || queryState.isExecuting}
                 />
               </div>
+              {/* Loading Indicator for initial form state */}
+              {queryState.loadingStage && (
+                <LoadingIndicator stage={queryState.loadingStage} />
+              )}
             </div>
           )}
         </div>

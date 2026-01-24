@@ -66,13 +66,13 @@ test.describe('Authentication Flow', () => {
   test('should show validation error for short password', async ({ page }) => {
     // Fill login form with short password
     await page.getByLabel(/email/i).fill('admin');
-    await page.locator('input[type="password"]').fill('short');
+    await page.locator('#password').fill('short');
 
     // Click login button
     await page.getByRole('button', { name: /log in/i }).click();
 
-    // Should show validation error (frontend validation)
-    await expect(page.getByText(/password must be at least 8 characters/i)).toBeVisible();
+    // Should show validation error in the alert div (frontend validation)
+    await expect(page.getByRole('alert')).toContainText(/password must be at least 8 characters/i);
 
     // Should remain on login page
     await expect(page).toHaveURL(/.*login/);
@@ -81,15 +81,15 @@ test.describe('Authentication Flow', () => {
   test('should logout successfully', async ({ page }) => {
     // Login first
     await page.getByLabel(/email/i).fill('admin');
-    await page.locator('input[type="password"]').fill('admin123');
+    await page.locator('#password').fill('admin123');
     await page.getByRole('button', { name: /log in/i }).click();
 
     // Wait for redirect to main app
     await page.waitForURL('/');
     await expect(page.getByText('admin')).toBeVisible();
 
-    // Click on username to open dropdown menu
-    await page.getByRole('button', { name: 'admin' }).click();
+    // Click on user menu button (has aria-label="User menu")
+    await page.getByRole('button', { name: /user menu/i }).click();
 
     // Click "Sign out" in the dropdown
     await page.getByRole('button', { name: /sign out/i }).click();
@@ -118,7 +118,8 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should toggle password visibility', async ({ page }) => {
-    const passwordInput = page.locator('input[type="password"]');
+    // Use stable selector based on id attribute
+    const passwordInput = page.locator('#password');
     const toggleButton = page.getByRole('button', { name: /show password|hide password/i });
 
     // Password should be hidden by default

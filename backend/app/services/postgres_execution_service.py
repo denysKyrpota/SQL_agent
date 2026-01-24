@@ -219,7 +219,7 @@ class PostgresExecutionService:
                 ) from e
             else:
                 logger.error(f"Database operational error: {e}")
-                raise DatabaseError(
+                raise DatabaseExecutionError(
                     f"Database connection error: {e}"
                 ) from e
 
@@ -235,7 +235,7 @@ class PostgresExecutionService:
 
         except Exception as e:
             logger.error(f"Unexpected error executing query: {e}", exc_info=True)
-            raise DatabaseError(
+            raise DatabaseExecutionError(
                 f"Unexpected database error: {e}"
             ) from e
 
@@ -319,7 +319,7 @@ class PostgresExecutionService:
             db.commit()
             raise
 
-        except DatabaseError as e:
+        except (DatabaseError, DatabaseExecutionError) as e:
             query_attempt.status = QueryStatus.FAILED_EXECUTION.value
             query_attempt.error_message = str(e)
             db.commit()
@@ -387,4 +387,9 @@ class PostgresExecutionService:
 
 class QueryTimeoutError(Exception):
     """Raised when query execution exceeds timeout."""
+    pass
+
+
+class DatabaseExecutionError(Exception):
+    """Raised when a database error occurs during query execution."""
     pass

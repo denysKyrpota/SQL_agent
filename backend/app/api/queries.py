@@ -35,6 +35,7 @@ from backend.app.schemas.queries import (
 )
 from backend.app.services.export_service import ExportService, ExportTooLargeError
 from backend.app.services.postgres_execution_service import (
+    DatabaseExecutionError,
     PostgresExecutionService,
     QueryTimeoutError,
 )
@@ -574,11 +575,18 @@ async def execute_query(
             detail=str(e),
         ) from e
 
+    except DatabaseExecutionError as e:
+        logger.error(f"Query {id} database execution error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}",
+        ) from e
+
     except Exception as e:
         logger.error(f"Query {id} execution error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}",
+            detail=f"An unexpected error occurred during execution: {str(e)}",
         ) from e
 
 

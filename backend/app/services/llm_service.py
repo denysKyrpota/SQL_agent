@@ -110,7 +110,7 @@ class LLMService:
         messages = [
             {
                 "role": "system",
-                "content": "You are a database expert. Your task is to select only the most relevant database tables needed to answer a given question."
+                "content": "You are a helpful database expert. Return only table names, comma-separated, no explanations."
             }
         ]
 
@@ -144,7 +144,8 @@ class LLMService:
                     continue
 
                 # Parse table names from response
-                logger.debug(f"Stage 1 raw response from LLM (attempt {attempt + 1}): {response_text[:500]}")
+                # Log the full response for debugging (up to 1000 chars)
+                logger.info(f"Stage 1 raw LLM response (attempt {attempt + 1}): {response_text[:1000]}")
                 selected_tables = self._parse_table_names(response_text, table_names)
 
                 if selected_tables:
@@ -199,39 +200,19 @@ class LLMService:
         if conversation_history:
             context_note = "\nNote: Consider the conversation history above when selecting tables."
 
-        prompt = f"""You are analyzing a PostgreSQL database for a logistics/transportation company to answer a question.
-
-DATABASE TABLES ({len(table_names)} total):
+        prompt = f"""Given these database tables for a logistics company:
 {tables_list}
 
-USER QUESTION:
-"{question}"{context_note}
+Question: "{question}"{context_note}
 
-TASK:
-Select the {max_tables} most relevant tables from the DATABASE TABLES list above.
+Select up to {max_tables} relevant tables. Common mappings:
+- activities/tasks → activity_activity
+- trucks/vehicles → asset_truck, asset_assignment
+- drivers → asset_driver
+- customers → customer_customer
 
-CRITICAL RULES:
-1. You MUST ONLY return table names that appear EXACTLY in the DATABASE TABLES list above
-2. NEVER return empty - always find at least one relevant table from the list
-3. If user terminology doesn't match table names exactly, find the closest semantic match:
-   - "orders" → look for activity_, customer_contract, invoice_ tables
-   - "customers" → look for customer_ tables
-   - "products" → look for cost_costproduct, integration_ tables
-   - "users" or "employees" → look for auth_user, asset_driver tables
-   - "vehicles", "trucks", "cars", "fleet" → look for asset_vehicle, asset_trailer, asset_assignment tables
-   - "drivers" → look for asset_driver, auth_user tables
-   - "activities", "tasks", "jobs", "work" → look for activity_activity tables
-   - "active" usually means checking a boolean field or status, not a separate table
-4. Consider tables that might contain the requested information even if named differently
-5. Include junction tables that connect related entities
-6. When in doubt, include more tables rather than fewer - it's better to include extra tables than miss important ones
-
-RESPONSE FORMAT:
-Return ONLY a comma-separated list of exact table names from the list above.
-Do not include any explanation, just the table names.
-Example: activity_activity, auth_user, customer_customer
-
-Your response:"""
+Return ONLY comma-separated table names from the list above, nothing else.
+Example: activity_activity, asset_truck, asset_assignment"""
 
         return prompt
 
@@ -275,16 +256,6 @@ Your response:"""
 
         logger.info("Stage 2: Generating SQL query")
 
-        # Log a warning if the question contains potentially confusing keywords
-        question_upper = question.upper()
-        confusing_keywords = ["DELETE", "INSERT", "UPDATE", "CREATE", "DROP", "ALTER", "TRUNCATE"]
-        found_keywords = [kw for kw in confusing_keywords if kw in question_upper]
-        if found_keywords:
-            logger.warning(
-                f"Question contains potentially confusing keywords: {found_keywords}. "
-                f"These will be interpreted as column names/filters, not SQL commands."
-            )
-
         # Build prompt for SQL generation
         prompt = self._build_sql_generation_prompt(
             question, schema_text, examples, conversation_history
@@ -295,45 +266,10 @@ Your response:"""
             {
                 "role": "system",
                 "content": (
-                    "You are an expert PostgreSQL developer who generates ONLY read-only SELECT queries. "
-                    "ABSOLUTE RULE: Your response MUST start with 'SELECT' or 'WITH' (for CTEs). "
-                    "FORBIDDEN WORDS IN YOUR RESPONSE: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, TRUNCATE. "
-                    "These commands are COMPLETELY PROHIBITED - do not use them anywhere in your SQL. "
-                    "\n\n"
-                    "CRITICAL: When you see words like 'deleted', 'created', 'updated' in questions, these refer to:\n"
-                    "- 'deleted' = a boolean column (deleted = true/false) or a timestamp (deleted_at)\n"
-                    "- 'created' = a timestamp column (created_at) showing when records were created\n"
-                    "- 'updated' = a timestamp column (updated_at) showing when records were updated\n"
-                    "- 'deactivated' = a timestamp column (deactivated_at) or status field\n"
-                    "\n"
-                    "You are working with a READ-ONLY database. You can ONLY retrieve data, never modify it. "
-                    "Every query must be a SELECT statement that reads existing data."
+                    "You are a PostgreSQL expert. Generate SELECT queries based on the schema provided. "
+                    "Return only the SQL query, no explanations or markdown."
                 )
-            },
-            {
-                "role": "user",
-                "content": "Show me all created customers"
-            },
-            {
-                "role": "assistant",
-                "content": "SELECT * FROM customers WHERE created_at IS NOT NULL;"
-            },
-            {
-                "role": "user",
-                "content": "Get deleted records from activities"
-            },
-            {
-                "role": "assistant",
-                "content": "SELECT * FROM activities WHERE deleted = true;"
-            },
-            {
-                "role": "user",
-                "content": "Deactivated created customers this month"
-            },
-            {
-                "role": "assistant",
-                "content": "SELECT * FROM customers WHERE deactivated_at IS NOT NULL AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE);"
-            },
+            }
         ]
 
         # Add conversation history if provided
@@ -352,6 +288,9 @@ Your response:"""
             max_tokens=settings.openai_max_tokens,
             temperature=settings.openai_temperature
         )
+
+        # Log raw response for debugging
+        logger.info(f"Stage 2 raw LLM response: {response_text[:1500] if response_text else 'EMPTY'}")
 
         # Extract SQL from response
         sql = self._extract_sql_from_response(response_text)
@@ -398,50 +337,14 @@ SIMILAR EXAMPLES FROM KNOWLEDGE BASE:
         if conversation_history:
             context_note = "\nNote: Consider the conversation history above when generating the SQL query. If the user is asking for modifications or refinements, build upon previous queries."
 
-        prompt = f"""⚠️ MANDATORY INSTRUCTION: Generate ONLY a SELECT query. Do NOT use DELETE, INSERT, UPDATE, CREATE, DROP, ALTER, or TRUNCATE.
-
-DATABASE SCHEMA:
+        prompt = f"""DATABASE SCHEMA:
 {schema_text}
 {examples_section}
-USER QUESTION:
-"{question}"{context_note}
+QUESTION: "{question}"{context_note}
 
-⚠️ CRITICAL: Words like "deleted", "created", "updated", "deactivated" in questions refer to COLUMN NAMES, NOT SQL commands!
-
-CORRECT INTERPRETATIONS (follow these patterns):
-❌ WRONG: "show deleted records" → DELETE FROM records...
-✅ CORRECT: "show deleted records" → SELECT * FROM records WHERE deleted = true;
-
-❌ WRONG: "created customers" → CREATE TABLE customers...
-✅ CORRECT: "created customers" → SELECT * FROM customers WHERE created_at IS NOT NULL;
-
-❌ WRONG: "deactivated users" → DROP TABLE users...
-✅ CORRECT: "deactivated users" → SELECT * FROM users WHERE deactivated_at IS NOT NULL;
-
-❌ WRONG: "updated orders" → UPDATE orders...
-✅ CORRECT: "updated orders" → SELECT * FROM orders WHERE updated_at IS NOT NULL;
-
-CRITICAL REQUIREMENTS - READ CAREFULLY:
-1. Generate ONLY a SELECT query - this is mandatory and non-negotiable
-2. NEVER generate CREATE, INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any other data modification commands
-3. Even if the question mentions words like "create", "add", "insert", "update", or "delete", you must interpret this as a request to QUERY existing data, not modify it
-4. Use only tables and columns from the schema above
-5. Follow best practices (proper JOINs, WHERE clauses, etc.)
-6. Use descriptive column aliases where helpful
-7. Return ONLY the SQL query, no explanations
-8. Format the query for readability (line breaks and indentation)
-
-IMPORTANT CLARIFICATIONS:
-- "Show created customers" means SELECT customers WHERE created_at...
-- "Get deleted activities" means SELECT activities WHERE deleted = true...
-- "Find updated records" means SELECT records WHERE updated_at...
-- You are ONLY querying a read-only database - you cannot modify anything
-
-RESPONSE FORMAT:
-Return ONLY the SQL query, starting with SELECT (or WITH for CTEs) and ending with semicolon.
-Do not include markdown code blocks (```sql) or any explanation.
-
-Your SQL query:"""
+Write a PostgreSQL SELECT query to answer this question.
+Use proper JOINs based on foreign keys in the schema.
+Return only the SQL, no explanations."""
 
         return prompt
 
@@ -590,6 +493,8 @@ Your SQL query:"""
         # Clean response
         cleaned = response_text.strip()
 
+        logger.debug(f"Parsing table names from response: {cleaned[:500]}")
+
         # Check for refusal patterns that indicate LLM didn't understand
         refusal_patterns = [
             "i cannot", "i can't", "i don't know", "i'm not sure",
@@ -600,10 +505,33 @@ Your SQL query:"""
             logger.warning(f"LLM appears to have refused or been uncertain: {cleaned[:200]}")
             raise ValueError(f"LLM could not determine tables: {cleaned[:100]}")
 
-        # Remove common prefixes/suffixes
-        for remove_str in ["```", "sql", "SELECT", "FROM"]:
-            cleaned = cleaned.replace(remove_str, "")
+        # Remove common prefixes/suffixes and markdown formatting
+        for remove_str in ["```", "sql", "SELECT", "FROM", "*", "-", "•", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10."]:
+            cleaned = cleaned.replace(remove_str, " ")
 
+        # Remove numbered list patterns like "1) " or "1. "
+        cleaned = re.sub(r'\d+[\.\)]\s*', ' ', cleaned)
+
+        # Build a map of valid table names (case-insensitive)
+        valid_table_names_lower = {name.lower(): name for name in valid_table_names}
+
+        # Method 1: Try to find valid table names directly in the response using regex
+        # This handles cases where table names are mixed with other text
+        validated = []
+        for valid_name_lower, valid_name in valid_table_names_lower.items():
+            # Look for the table name as a whole word
+            pattern = rf'\b{re.escape(valid_name_lower)}\b'
+            if re.search(pattern, cleaned.lower()):
+                if valid_name not in validated:
+                    validated.append(valid_name)
+                    logger.debug(f"Found valid table via regex: {valid_name}")
+
+        # If we found tables via regex, return them
+        if validated:
+            logger.info(f"Parsed {len(validated)} table names via regex matching")
+            return validated
+
+        # Method 2: Traditional delimiter-based parsing as fallback
         # Split by common delimiters (prioritize comma and newline over space)
         table_names = []
         for delimiter in [",", "\n", ";"]:
@@ -618,23 +546,23 @@ Your SQL query:"""
             table_names = [p for p in parts if p and not p.isspace()]
 
         # Validate against actual table names
-        valid_table_names_lower = {name.lower(): name for name in valid_table_names}
-        validated = []
-
         for name in table_names:
             name_lower = name.lower().strip()
             # Check if this candidate matches a valid table name exactly
             if name_lower in valid_table_names_lower:
-                validated.append(valid_table_names_lower[name_lower])
+                if valid_table_names_lower[name_lower] not in validated:
+                    validated.append(valid_table_names_lower[name_lower])
             else:
                 # Also check if any valid table name is contained in this candidate
                 # This handles cases like "i recommend: users" -> "users"
                 for valid_name_lower, valid_name in valid_table_names_lower.items():
                     if valid_name_lower in name_lower.split():
-                        validated.append(valid_name)
+                        if valid_name not in validated:
+                            validated.append(valid_name)
                         break
                 else:
-                    logger.warning(f"LLM suggested invalid table name: '{name}'")
+                    if name and len(name) > 2:  # Only log for non-trivial strings
+                        logger.debug(f"LLM suggested invalid table name: '{name}'")
 
         if not validated:
             logger.error(

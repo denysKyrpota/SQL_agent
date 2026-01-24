@@ -93,8 +93,6 @@ const LoginView: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isAuthenticating}
                 autoComplete="current-password"
-                minLength={8}
-                required
               />
               <button
                 type="button"
