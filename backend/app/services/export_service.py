@@ -89,9 +89,7 @@ class ExportService:
 
         # Load results
         if manifest.columns_json is None or manifest.results_json is None:
-            raise ValueError(
-                f"No results data available for query {query_attempt_id}."
-            )
+            raise ValueError(f"No results data available for query {query_attempt_id}.")
         columns = json.loads(manifest.columns_json)
         rows = json.loads(manifest.results_json)
 

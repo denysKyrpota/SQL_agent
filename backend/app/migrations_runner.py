@@ -6,7 +6,7 @@ tracking which migrations have been applied to avoid re-running them.
 
 Usage:
     python backend/app/migrations_runner.py
-    
+
 Or from another module:
     from backend.app.migrations_runner import run_migrations
     run_migrations(db_path='./data/app_data/app.db')
@@ -47,16 +47,14 @@ class MigrationRunner:
 
         This table tracks which migrations have been applied
         """
-        conn.execute(
-            """
+        conn.execute("""
             create table if not exists schema_migrations (
                 id integer primary key autoincrement,
                 version text not null unique,
                 name text not null,
                 applied_at text not null default (datetime('now'))
             )
-        """
-        )
+        """)
         conn.commit()
 
     def _get_applied_migrations(self, conn: sqlite3.Connection) -> set:
@@ -270,8 +268,7 @@ if __name__ == "__main__":
         elif command == "dry-run":
             run_migrations(dry_run=True)
         elif command == "help":
-            print(
-                """
+            print("""
 SQLite Migration Runner
 
 Commands:
@@ -285,8 +282,7 @@ The runner automatically:
 - Tracks which migrations have been applied
 - Runs migrations in order based on their timestamp
 - Ensures migrations are only run once
-            """
-            )
+            """)
         else:
             print(f"Unknown command: {command}")
             print("Use 'help' to see available commands")

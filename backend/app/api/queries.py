@@ -93,7 +93,7 @@ kb_service = KnowledgeBaseService()
     },
 )
 async def get_example_questions(
-    current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Get example questions from knowledge base.
