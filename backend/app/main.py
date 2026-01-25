@@ -130,7 +130,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 # ============================================================================
 
 # Authentication endpoints
-from backend.app.api import auth
+from backend.app.api import auth  # noqa: E402
 
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 
@@ -138,12 +138,12 @@ app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(queries.router, prefix="/api", tags=["Queries"])
 
 # Chat endpoints
-from backend.app.api import chat
+from backend.app.api import chat  # noqa: E402
 
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 
 # Admin endpoints
-from backend.app.api import admin
+from backend.app.api import admin  # noqa: E402
 
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 

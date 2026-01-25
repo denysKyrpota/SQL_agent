@@ -207,7 +207,7 @@ class AuthService:
 
         # Check if session is valid
         if not session.is_valid():
-            logger.debug(f"Invalid session token (expired or revoked)")
+            logger.debug("Invalid session token (expired or revoked)")
             return None
 
         # Get user
@@ -255,7 +255,7 @@ class AuthService:
         """
         count = (
             db.query(SessionModel)
-            .filter(SessionModel.user_id == user_id, SessionModel.revoked == False)
+            .filter(SessionModel.user_id == user_id, SessionModel.revoked.is_(False))
             .update({"revoked": True})
         )
         db.commit()

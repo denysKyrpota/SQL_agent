@@ -161,7 +161,7 @@ async def refresh_knowledge_base(
 
     try:
         kb_service = KnowledgeBaseService()
-        examples = kb_service.refresh_examples()
+        kb_service.refresh_examples()
 
         stats = kb_service.get_stats()
 

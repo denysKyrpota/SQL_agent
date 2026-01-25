@@ -202,7 +202,7 @@ async def logout(
     revoked = auth_service.revoke_session(db, session_token)
 
     if not revoked:
-        logger.warning(f"Logout attempt with invalid session token")
+        logger.warning("Logout attempt with invalid session token")
 
     # Clear cookie regardless of whether session was found
     response.delete_cookie(key="session_token")

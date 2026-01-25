@@ -9,7 +9,7 @@ import json
 import logging
 import math
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 

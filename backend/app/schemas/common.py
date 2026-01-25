@@ -3,9 +3,8 @@ Common schemas and shared types used across the API.
 """
 
 from enum import Enum
-from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class QueryStatus(str, Enum):

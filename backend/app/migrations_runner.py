@@ -17,7 +17,6 @@ import sqlite3
 from pathlib import Path
 from typing import List, Tuple
 import re
-from datetime import datetime
 
 
 class MigrationRunner:

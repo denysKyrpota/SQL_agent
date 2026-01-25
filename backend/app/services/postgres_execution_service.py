@@ -299,7 +299,7 @@ class PostgresExecutionService:
             query_attempt.execution_ms = result.execution_ms
 
             # Create results manifest for pagination
-            manifest = self._create_results_manifest(
+            self._create_results_manifest(
                 db=db, query_attempt_id=query_attempt.id, result=result
             )
 

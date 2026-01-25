@@ -218,7 +218,7 @@ class ExportService:
             return {"exportable": False, "error": "No results data available"}
 
         columns = json.loads(manifest.columns_json)
-        rows = json.loads(manifest.results_json)
+        json.loads(manifest.results_json)  # Verify JSON is valid
 
         total_rows = manifest.total_rows or 0
 

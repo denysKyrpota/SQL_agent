@@ -8,7 +8,6 @@ This service handles the two-stage SQL generation process:
 
 import logging
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy.orm import Session
 

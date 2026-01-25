@@ -9,7 +9,6 @@ Implements a two-stage SQL generation process:
 import asyncio
 import logging
 import re
-from typing import Any
 
 from openai import (
     AsyncOpenAI,
@@ -181,9 +180,9 @@ class LLMService:
                 f"Failed to select tables after 3 attempts for question: {question}.{error_detail}"
             )
             raise ValueError(
-                f"Could not identify relevant tables for your question. "
-                f"This database contains logistics/transportation data (activities, drivers, vehicles, customers, contracts). "
-                f"Try rephrasing with domain-specific terms."
+                "Could not identify relevant tables for your question. "
+                "This database contains logistics/transportation data (activities, drivers, vehicles, customers, contracts). "
+                "Try rephrasing with domain-specific terms."
             )
 
         logger.info(
@@ -467,8 +466,8 @@ Return only the SQL, no explanations."""
                     and "unsupported" in error_str.lower()
                 ):
                     logger.warning(
-                        f"Azure deployment does not support temperature parameter. "
-                        f"Disabling temperature and retrying. This may result in less deterministic responses."
+                        "Azure deployment does not support temperature parameter. "
+                        "Disabling temperature and retrying. This may result in less deterministic responses."
                     )
                     self._azure_supports_temperature = False
                     # Immediate retry without temperature (don't count as failed attempt)

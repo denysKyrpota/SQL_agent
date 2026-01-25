@@ -7,7 +7,6 @@ This service handles conversation management and context-aware SQL generation.
 import json
 import logging
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -112,14 +111,14 @@ class ChatService:
         # Get total count
         total_count = (
             db.query(func.count(Conversation.id))
-            .filter(Conversation.user_id == user_id, Conversation.is_active == True)
+            .filter(Conversation.user_id == user_id, Conversation.is_active.is_(True))
             .scalar()
         )
 
         # Get conversations
         conversations = (
             db.query(Conversation)
-            .filter(Conversation.user_id == user_id, Conversation.is_active == True)
+            .filter(Conversation.user_id == user_id, Conversation.is_active.is_(True))
             .order_by(Conversation.updated_at.desc())
             .offset(offset)
             .limit(page_size)

@@ -43,8 +43,8 @@ from backend.app.services.postgres_execution_service import (
 from backend.app.services.query_service import (
     LLMServiceUnavailableError,
     QueryService,
-    SQLGenerationError,
 )
+from backend.app.services.knowledge_base_service import KnowledgeBaseService
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,6 @@ router = APIRouter(prefix="/queries", tags=["Queries"])
 query_service = QueryService()
 postgres_service = PostgresExecutionService()
 export_service = ExportService()
-
-# Initialize knowledge base service for examples
-from backend.app.services.knowledge_base_service import KnowledgeBaseService
 
 kb_service = KnowledgeBaseService()
 
