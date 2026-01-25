@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import type { QueryStatus } from '@/types/models';
+import type { QueryStatus } from '@/types/common';
 import styles from './QueryFilters.module.css';
 
 interface QueryFiltersProps {

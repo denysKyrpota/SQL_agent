@@ -115,8 +115,8 @@ export async function listQueries(
     queryParams.append('page', params.page.toString());
   }
 
-  if (params.limit) {
-    queryParams.append('page_size', params.limit.toString());
+  if (params.page_size) {
+    queryParams.append('page_size', params.page_size.toString());
   }
 
   if (params.status_filter) {

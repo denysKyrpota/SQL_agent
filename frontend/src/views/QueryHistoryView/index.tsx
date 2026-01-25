@@ -12,7 +12,8 @@ import Toast from '@/components/Toast';
 import QueryFilters from './components/QueryFilters';
 import QueryHistoryTable from './components/QueryHistoryTable';
 import { isAPIError } from '@/types/api';
-import type { SimplifiedQueryAttempt, QueryStatus } from '@/types/models';
+import type { SimplifiedQueryAttempt } from '@/types/models';
+import type { QueryStatus } from '@/types/common';
 import styles from './QueryHistoryView.module.css';
 
 const QueryHistoryView: React.FC = () => {
@@ -52,7 +53,7 @@ const QueryHistoryView: React.FC = () => {
       const response = await listQueries(params);
 
       setQueries(response.queries);
-      setTotalPages(response.pagination.page_count);
+      setTotalPages(response.pagination.total_pages);
     } catch (error) {
       console.error('Failed to fetch queries:', error);
 

@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import type { QueryStatus } from '@/types/models';
+import type { QueryStatus } from '@/types/common';
 
 /**
  * Get status badge component with appropriate styling

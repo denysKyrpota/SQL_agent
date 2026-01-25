@@ -29,8 +29,9 @@ const Pagination: React.FC<PaginationProps> = ({
     }
   };
 
-  const startRow = (currentPage - 1) * pageSize + 1;
-  const endRow = Math.min(currentPage * pageSize, totalRows);
+  const showRowInfo = pageSize !== undefined && totalRows !== undefined;
+  const startRow = showRowInfo ? (currentPage - 1) * pageSize + 1 : 0;
+  const endRow = showRowInfo ? Math.min(currentPage * pageSize, totalRows) : 0;
 
   return (
     <nav
@@ -51,9 +52,11 @@ const Pagination: React.FC<PaginationProps> = ({
         <span className="page-indicator">
           Page {currentPage} of {totalPages}
         </span>
-        <span className="row-indicator">
-          Showing {startRow.toLocaleString()}-{endRow.toLocaleString()} of {totalRows.toLocaleString()} rows
-        </span>
+        {showRowInfo && (
+          <span className="row-indicator">
+            Showing {startRow.toLocaleString()}-{endRow.toLocaleString()} of {totalRows.toLocaleString()} rows
+          </span>
+        )}
       </div>
 
       <Button

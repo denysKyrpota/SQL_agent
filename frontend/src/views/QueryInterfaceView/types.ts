@@ -188,8 +188,8 @@ export interface ResultsTableProps {
 export interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  pageSize: number;
-  totalRows: number;
+  pageSize?: number;
+  totalRows?: number;
   onPageChange: (page: number) => void;
 }
 
