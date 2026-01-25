@@ -8,7 +8,7 @@ and filtering by table names for optimized LLM context.
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from backend.app.config import get_settings
 
@@ -208,7 +208,7 @@ class SchemaService:
             list[str]: Sorted list of table names
         """
         schema = self.get_schema()
-        return schema["table_names"]
+        return cast(list[str], schema["table_names"])
 
     def filter_schema_by_tables(self, table_names: list[str]) -> dict[str, Any]:
         """
@@ -355,7 +355,7 @@ class SchemaService:
             dict | None: Table information or None if not found
         """
         schema = self.get_schema()
-        return schema["tables"].get(table_name)
+        return cast(dict[str, Any] | None, schema["tables"].get(table_name))
 
     def search_tables_by_keyword(self, keyword: str) -> list[str]:
         """

@@ -420,13 +420,13 @@ Return only the SQL, no explanations."""
 
                 response = await self.client.chat.completions.create(**api_params)
 
-                response_text = response.choices[0].message.content
+                response_text = response.choices[0].message.content or ""
 
                 logger.info(
                     f"{'Azure ' if self.is_azure else ''}OpenAI API call successful: {response.usage.total_tokens} tokens used"
                 )
 
-                return response_text
+                return str(response_text)
 
             except RateLimitError as e:
                 # Rate limit hit - use exponential backoff
@@ -768,7 +768,7 @@ Return only the SQL, no explanations."""
                 f"{response.usage.total_tokens} tokens used"
             )
 
-            return embedding
+            return list(embedding)
 
         except Exception as e:
             logger.error(f"Error generating embedding: {e}", exc_info=True)

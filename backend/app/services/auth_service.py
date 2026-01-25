@@ -41,7 +41,7 @@ class AuthService:
         """
         salt = bcrypt.gensalt()
         password_hash = bcrypt.hashpw(password.encode("utf-8"), salt)
-        return password_hash.decode("utf-8")
+        return str(password_hash.decode("utf-8"))
 
     @staticmethod
     def verify_password(password: str, password_hash: str) -> bool:
@@ -56,8 +56,8 @@ class AuthService:
             bool: True if password matches, False otherwise
         """
         try:
-            return bcrypt.checkpw(
-                password.encode("utf-8"), password_hash.encode("utf-8")
+            return bool(
+                bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
             )
         except Exception as e:
             logger.error(f"Password verification error: {e}")
