@@ -15,7 +15,7 @@ const STAGE_MESSAGES = {
   execution: 'Running query...',
 };
 
-const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ stage, startTime }) => {
+const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ stage, startTime: _startTime }) => {
   const message = STAGE_MESSAGES[stage];
 
   return (

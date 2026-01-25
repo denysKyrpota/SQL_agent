@@ -2,7 +2,7 @@
  * Type definitions for Query Interface View
  */
 
-import type { QueryStatus, ISO8601Timestamp } from '@/types/common';
+import type { QueryStatus } from '@/types/common';
 import type { QueryResults } from '@/types/models';
 
 /**

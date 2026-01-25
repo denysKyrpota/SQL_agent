@@ -79,7 +79,7 @@ const formatCellValue = (value: any): string => {
 const ResultsTable: React.FC<ResultsTableProps> = ({
   columns,
   rows,
-  totalRows,
+  totalRows: _totalRows,
 }) => {
   if (rows.length === 0) {
     return (

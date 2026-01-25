@@ -43,6 +43,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (initialConversationId !== undefined && initialConversationId !== conversationId) {
       setConversationId(initialConversationId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialConversationId]);
 
   // Load conversation messages
@@ -50,6 +51,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (conversationId) {
       loadMessages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   // Auto-scroll to bottom when new messages arrive
