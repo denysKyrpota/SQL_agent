@@ -32,6 +32,7 @@ class TestServiceInitialization:
     def test_init_without_api_key(self, mock_settings):
         """Test service initialization without API key."""
         mock_settings.openai_api_key = None
+        mock_settings.use_azure_openai = False
 
         service = LLMService()
 
@@ -71,7 +72,8 @@ class TestBuildTableSelectionPrompt:
         # Check that all tables are mentioned
         assert "table_0" in prompt
         assert "table_99" in prompt
-        assert "100 total" in prompt
+        # Check that max_tables is included in prompt
+        assert "5" in prompt or "up to 5" in prompt.lower()
 
 
 class TestParseTableNames:

@@ -55,7 +55,8 @@ class TestCreateQueryAttempt:
                 sql="SELECT * FROM users WHERE active = true;"
             )
         ]
-        mock_kb.find_similar_examples = AsyncMock(return_value=kb_examples)
+        # find_similar_examples returns tuple[list[KBExample], float]
+        mock_kb.find_similar_examples = AsyncMock(return_value=(kb_examples, 0.75))
 
         # Create service with mocks
         service = QueryService(
@@ -148,7 +149,8 @@ class TestCreateQueryAttempt:
         mock_schema.format_schema_for_llm = MagicMock(return_value="Schema...")
 
         mock_kb = AsyncMock()
-        mock_kb.find_similar_examples = AsyncMock(return_value=[])
+        # find_similar_examples returns tuple[list[KBExample], float]
+        mock_kb.find_similar_examples = AsyncMock(return_value=([], 0.0))
 
         service = QueryService(
             llm_service=mock_llm,
@@ -204,7 +206,8 @@ class TestGenerateSQL:
             sql="SELECT * FROM activity_activity;"
         )
         mock_kb = AsyncMock()
-        mock_kb.find_similar_examples = AsyncMock(return_value=[kb_example])
+        # find_similar_examples returns tuple[list[KBExample], float]
+        mock_kb.find_similar_examples = AsyncMock(return_value=([kb_example], 0.8))
 
         service = QueryService(
             llm_service=mock_llm,
@@ -266,7 +269,8 @@ class TestGenerateSQL:
         mock_llm.generate_sql = AsyncMock(return_value="SELECT 1;")
         mock_schema.filter_schema_by_tables = MagicMock(return_value={})
         mock_schema.format_schema_for_llm = MagicMock(return_value="")
-        mock_kb.find_similar_examples = AsyncMock(return_value=[])
+        # find_similar_examples returns tuple[list[KBExample], float]
+        mock_kb.find_similar_examples = AsyncMock(return_value=([], 0.0))
 
         sql = await service._generate_sql(
             natural_language_query="Show me something",
