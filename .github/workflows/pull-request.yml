@@ -97,6 +97,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create data directory
+        run: mkdir -p data/app_data
+
       - name: Run pytest with coverage
         run: |
           pytest tests/ -v \
@@ -208,7 +211,9 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Initialize test database
-        run: make db-init
+        run: |
+          mkdir -p data/app_data
+          make db-init
 
       - name: Build frontend
         working-directory: frontend
