@@ -16,7 +16,7 @@ SQL AI Agent - A production-ready text-to-SQL application that converts natural 
 
 ```bash
 # Database management (Makefile)
-make db-init          # Initialize with default users (admin/admin123, testuser/testpass123)
+make db-init          # Initialize with default test users
 make db-init-clean    # Initialize without default users
 make db-reset         # Reset database (WARNING: deletes all data)
 make db-migrate       # Run pending migrations

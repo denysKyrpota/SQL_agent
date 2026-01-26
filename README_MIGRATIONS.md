@@ -45,14 +45,9 @@ python backend/app/migrations_runner.py dry-run
 
 ## Default Users
 
-After running `make db-init`, these users are created:
+After running `make db-init`, default test users are created.
 
-| Username | Password  | Role  |
-|----------|-----------|-------|
-| admin    | admin123  | admin |
-| user     | user123   | user  |
-
-⚠️ **Change these passwords in production!**
+⚠️ **Create your own secure credentials for production!**
 
 ## Creating a New Migration
 

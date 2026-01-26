@@ -131,9 +131,7 @@ const LoginView: React.FC = () => {
 
         <div className={styles.loginFooter}>
           <p className={styles.demoCredentials}>
-            <strong>Demo credentials:</strong><br />
-            Username: <code>admin</code> / Password: <code>admin123</code><br />
-            Username: <code>testuser</code> / Password: <code>testpass123</code>
+            <strong>Note:</strong> Use credentials created during setup (<code>make db-init</code>)
           </p>
         </div>
       </div>

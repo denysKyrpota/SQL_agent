@@ -437,7 +437,7 @@ npm run lint                 # ESLint
 
 ### Database Management
 ```bash
-make db-init                 # Initialize with admin/testuser
+make db-init                 # Initialize with default test users
 make db-migrate              # Run pending migrations
 make db-status               # Check migration status
 make db-shell                # SQLite CLI

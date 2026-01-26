@@ -38,7 +38,7 @@ The migration system uses timestamped SQL files to version and manage database s
 ### 1. Initialize a New Database
 
 ```bash
-# Initialize database with default users (admin/admin123, user/user123)
+# Initialize database with default test users
 python scripts/init_db.py
 
 # Initialize without default users

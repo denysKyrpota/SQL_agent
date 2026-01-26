@@ -77,6 +77,8 @@ htmlcov/
 playwright-report/
 test-results/
 playwright/.cache/
+run-e2e-manual.ps1
+run-e2e.ps1
 
 # Node (for frontend)
 node_modules/

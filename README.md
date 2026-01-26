@@ -120,7 +120,7 @@ uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
 - **Frontend:** http://localhost:5173
 - **API Docs:** http://localhost:8000/docs
-- **Default Login:** `admin` / `admin123`
+- **Default Login:** Use credentials created by `make db-init` (see setup instructions)
 
 ## Configuration
 
@@ -486,4 +486,3 @@ For issues and questions:
 ---
 
 **Built with ❤️ for seamless text-to-SQL conversion**
-# CI Test

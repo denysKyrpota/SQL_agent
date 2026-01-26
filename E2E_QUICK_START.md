@@ -66,7 +66,7 @@ If both load, you're ready to test! 🎉
 
 ✅ **Working without API keys:**
 - ✓ Show login page
-- ✓ Login with valid credentials (admin/admin123)
+- ✓ Login with valid credentials
 - ✓ Show error with invalid credentials
 - ✓ Validate short password
 - ✓ Logout successfully
@@ -178,7 +178,7 @@ All query tests use this helper:
 async function login(page) {
   await page.goto('/');
   await page.getByLabel(/email/i).fill('admin');
-  await page.getByLabel(/password/i).fill('admin123');
+  await page.getByLabel(/password/i).fill('your-test-password');
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForURL('/');
   await expect(page.getByText('admin')).toBeVisible();
