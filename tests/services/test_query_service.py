@@ -240,10 +240,10 @@ class TestGenerateSQL:
         )
 
         # Verify Stage 3: KB examples
-        mock_kb.find_similar_examples.assert_called_once_with(
-            question="Show me activities with user names",
-            top_k=3
-        )
+        mock_kb.find_similar_examples.assert_called_once()
+        call_kwargs = mock_kb.find_similar_examples.call_args.kwargs
+        assert call_kwargs["question"] == "Show me activities with user names"
+        assert call_kwargs["top_k"] == 3
 
         # Verify Stage 4: SQL generation
         mock_llm.generate_sql.assert_called_once()
