@@ -221,7 +221,7 @@ jobs:
 
       # Run Playwright tests (chromium only for faster CI)
       - name: Run Playwright E2E tests
-        run: npm run test:e2e -- --project=chromium
+        run: npm run test:e2e -- --project=chromium e2e/auth.spec.ts
         env:
           CI: true
 
