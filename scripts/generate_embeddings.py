@@ -14,7 +14,7 @@ Arguments:
     --force    Skip confirmation prompts and regenerate all embeddings
 
 Requirements:
-    - OPENAI_API_KEY must be set in .env file
+    - OPENAI_API_KEY or Azure OpenAI credentials must be set in .env file
     - Knowledge base examples must exist in data/knowledge_base/
 """
 
@@ -47,16 +47,40 @@ async def main(force: bool = False):
     # Check configuration
     settings = get_settings()
 
-    if not settings.openai_api_key:
-        print("❌ ERROR: OPENAI_API_KEY not configured")
-        print()
-        print("Please set OPENAI_API_KEY in your .env file:")
-        print("  OPENAI_API_KEY=sk-...")
-        print()
-        return 1
+    # Check for either OpenAI or Azure OpenAI configuration
+    use_azure = settings.use_azure_openai
 
-    print(f"✓ OpenAI API key configured")
-    print(f"✓ Embedding model: {settings.openai_embedding_model}")
+    if use_azure:
+        if not settings.azure_openai_api_key or not settings.azure_openai_endpoint:
+            print("❌ ERROR: Azure OpenAI not configured")
+            print()
+            print("Please set in your .env file:")
+            print("  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com")
+            print("  AZURE_OPENAI_API_KEY=your-api-key")
+            print("  AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your-embedding-deployment")
+            print()
+            return 1
+
+        embedding_model = settings.azure_openai_embedding_deployment or settings.azure_openai_deployment
+        print(f"✓ Azure OpenAI configured")
+        print(f"✓ Endpoint: {settings.azure_openai_endpoint}")
+        print(f"✓ Embedding deployment: {embedding_model}")
+    else:
+        if not settings.openai_api_key:
+            print("❌ ERROR: OPENAI_API_KEY not configured")
+            print()
+            print("Please set OPENAI_API_KEY in your .env file:")
+            print("  OPENAI_API_KEY=sk-...")
+            print()
+            print("Or configure Azure OpenAI:")
+            print("  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com")
+            print("  AZURE_OPENAI_API_KEY=your-api-key")
+            print()
+            return 1
+
+        print(f"✓ OpenAI API key configured")
+        print(f"✓ Embedding model: {settings.openai_embedding_model}")
+
     print(f"✓ Similarity threshold: {settings.rag_similarity_threshold}")
     print()
 
@@ -159,7 +183,8 @@ async def main(force: bool = False):
         print(f"Failed to generate embeddings: {e}")
         print()
         print("Possible issues:")
-        print("  • OpenAI API key invalid or expired")
+        print("  • API key invalid or expired")
+        print("  • Azure deployment name incorrect")
         print("  • Network connection issue")
         print("  • Rate limit exceeded")
         print()
