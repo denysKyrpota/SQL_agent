@@ -8,8 +8,10 @@ with timeout handling and result pagination.
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 import sqlparse
 from sqlalchemy import create_engine, text
@@ -23,6 +25,23 @@ from backend.app.schemas.common import QueryStatus
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+class PostgresJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for PostgreSQL data types."""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, date):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, bytes):
+            return obj.decode('utf-8', errors='replace')
+        return super().default(obj)
 
 
 @dataclass
@@ -352,7 +371,7 @@ class PostgresExecutionService:
 
         # Serialize results
         columns_json = json.dumps(result.columns)
-        rows_json = json.dumps(result.rows)
+        rows_json = json.dumps(result.rows, cls=PostgresJSONEncoder)
 
         # Create manifest
         manifest = QueryResultsManifest(
