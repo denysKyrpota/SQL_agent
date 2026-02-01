@@ -24,9 +24,11 @@ interface MessageBubbleProps {
 
 /**
  * Extract SQL from markdown code block
+ * Handles various line endings (\n, \r\n) and whitespace variations
  */
 function extractSQL(content: string): string | null {
-  const sqlBlockRegex = /```sql\n([\s\S]*?)\n```/;
+  // More flexible regex that handles different line endings and whitespace
+  const sqlBlockRegex = /```sql\s*([\s\S]*?)\s*```/;
   const match = content.match(sqlBlockRegex);
   return match ? match[1].trim() : null;
 }
@@ -40,7 +42,8 @@ function renderContent(content: string, role: Message['role']): React.ReactNode 
   }
 
   // For assistant messages, check if there's a SQL code block
-  const sqlBlockRegex = /```sql\n([\s\S]*?)\n```/;
+  // Flexible regex that handles different line endings and whitespace
+  const sqlBlockRegex = /```sql\s*([\s\S]*?)\s*```/;
   const match = content.match(sqlBlockRegex);
 
   if (!match) {
