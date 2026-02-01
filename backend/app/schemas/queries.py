@@ -250,12 +250,16 @@ class ExampleQuestion(BaseModel):
     description: str | None = Field(
         default=None, description="Optional description of what the query does"
     )
+    sql: str = Field(description="Pre-existing SQL query from knowledge base")
+    filename: str = Field(description="KB example filename identifier")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "title": "Drivers With Current Availability",
                 "description": "Show all drivers and their current availability status",
+                "sql": "SELECT d.id, d.name, da.status FROM drivers d JOIN driver_availability da ON d.id = da.driver_id;",
+                "filename": "drivers_with_current_availability.sql",
             }
         }
 

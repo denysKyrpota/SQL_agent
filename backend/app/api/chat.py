@@ -27,6 +27,7 @@ from backend.app.schemas.chat import (
     RegenerateMessageRequest,
     EditMessageRequest,
     MessageResponse,
+    LoadExampleRequest,
 )
 from backend.app.schemas.common import PaginationMetadata
 from backend.app.services.chat_service import ChatService
@@ -238,6 +239,68 @@ async def send_message(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Failed to generate response: {str(e)}",
+        )
+
+
+@router.post(
+    "/messages/from-example",
+    response_model=SendMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Load a knowledge base example into chat",
+    responses={
+        201: {"description": "Example loaded successfully"},
+        400: {"description": "Invalid request"},
+        401: {"description": "Not authenticated"},
+        404: {"description": "KB example or conversation not found"},
+    },
+)
+async def load_example(
+    request: LoadExampleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Load a knowledge base example directly into a conversation.
+
+    This endpoint bypasses LLM generation and loads pre-existing SQL
+    from the knowledge base directly. The QueryAttempt is created with
+    generation_ms=0 to indicate it was pre-loaded.
+
+    Args:
+        request: Filename and optional conversation ID
+        current_user: Authenticated user (from dependency)
+        db: Database session (from dependency)
+
+    Returns:
+        SendMessageResponse with user and assistant messages
+
+    Raises:
+        HTTPException 404: If KB example or conversation not found
+    """
+    logger.info(
+        f"Loading KB example for user {current_user.id}",
+        extra={
+            "user_id": current_user.id,
+            "kb_filename": request.filename,
+            "conversation_id": request.conversation_id,
+        },
+    )
+
+    try:
+        response = chat_service.load_example_into_conversation(
+            db, current_user.id, request
+        )
+        return response
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error loading KB example: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load example: {str(e)}",
         )
 
 

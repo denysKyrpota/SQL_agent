@@ -115,6 +115,8 @@ async def get_example_questions(
             {
                 "title": example.title,
                 "description": example.description,
+                "sql": example.sql,
+                "filename": example.filename,
             }
             for example in examples
         ]

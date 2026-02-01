@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { QueryInterfaceState } from './types';
+import type { QueryInterfaceState, ExampleQuestion } from './types';
 import QueryForm from './components/QueryForm';
 import LoadingIndicator from './components/LoadingIndicator';
 import SqlPreviewSection from './components/SqlPreviewSection';
@@ -29,7 +29,7 @@ import styles from './QueryInterfaceView.module.css';
 
 const QueryInterfaceView: React.FC = () => {
   // Example questions from knowledge base
-  const [exampleQuestions, setExampleQuestions] = useState<string[]>([]);
+  const [exampleQuestions, setExampleQuestions] = useState<ExampleQuestion[]>([]);
   // Main state
   const [queryState, setQueryState] = useState<QueryInterfaceState>({
     naturalLanguageQuery: '',
@@ -61,16 +61,11 @@ const QueryInterfaceView: React.FC = () => {
     const loadExamples = async () => {
       try {
         const response = await getExampleQuestions();
-        const questions = response.examples.map(ex => ex.title);
-        setExampleQuestions(questions);
+        setExampleQuestions(response.examples);
       } catch (error) {
         console.error('Failed to load example questions:', error);
-        // Use fallback examples if API fails
-        setExampleQuestions([
-          "What were our top 10 customers by revenue last quarter?",
-          "Show me all orders from the last 30 days",
-          "How many active users do we have by region?",
-        ]);
+        // Use empty array if API fails - no fallback since we need full example objects
+        setExampleQuestions([]);
       }
     };
 
@@ -360,9 +355,56 @@ const QueryInterfaceView: React.FC = () => {
     }));
   };
 
-  // Handle example question selection
-  const handleExampleSelect = (example: string) => {
-    handleInputChange(example);
+  // Handle example question selection - loads KB example directly
+  const handleExampleSelect = async (example: ExampleQuestion) => {
+    setQueryState(prev => ({
+      ...prev,
+      isGenerating: true,
+      loadingStage: 'generation',
+      error: null,
+    }));
+
+    try {
+      // Load KB example directly (no LLM generation)
+      const response = await chatService.loadExample({
+        filename: example.filename,
+        conversation_id: conversationId,
+      });
+
+      // Update conversation ID if this is first message
+      if (!conversationId) {
+        setConversationId(response.conversation_id);
+      }
+
+      // Enable chat mode after successful load
+      if (!chatOpen) {
+        setChatOpen(true);
+      }
+
+      setQueryState(prev => ({
+        ...prev,
+        isGenerating: false,
+        loadingStage: null,
+      }));
+
+    } catch (error) {
+      console.error('Failed to load example:', error);
+
+      let errorMessage = 'Failed to load example';
+      if (isAPIError(error)) {
+        errorMessage = error.detail || errorMessage;
+      }
+
+      setQueryState(prev => ({
+        ...prev,
+        isGenerating: false,
+        loadingStage: null,
+        error: {
+          type: 'generation',
+          message: errorMessage,
+        },
+      }));
+    }
   };
 
   // Handle query execution from chat

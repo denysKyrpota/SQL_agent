@@ -35,6 +35,11 @@ export interface SendMessageRequest {
   conversation_id?: number;
 }
 
+export interface LoadExampleRequest {
+  filename: string;
+  conversation_id?: number;
+}
+
 export interface SendMessageResponse {
   conversation_id: number;
   user_message: Message;
@@ -115,6 +120,19 @@ export const chatService = {
     return apiClient.put<Message>(`/chat/messages/${messageId}`, {
       content,
     });
+  },
+
+  /**
+   * Load a knowledge base example directly into chat
+   * Bypasses LLM generation - uses pre-existing SQL
+   */
+  loadExample: async (
+    request: LoadExampleRequest
+  ): Promise<SendMessageResponse> => {
+    return apiClient.post<SendMessageResponse>(
+      '/chat/messages/from-example',
+      request
+    );
   },
 };
 

@@ -21,6 +21,7 @@ from backend.app.schemas.chat import (
     MessageResponse,
     ConversationMessagesResponse,
     EditMessageRequest,
+    LoadExampleRequest,
 )
 from backend.app.services.llm_service import LLMService
 from backend.app.services.schema_service import SchemaService
@@ -536,6 +537,125 @@ class ChatService:
         )
 
         return self._message_to_response(new_message)
+
+    def load_example_into_conversation(
+        self, db: Session, user_id: int, request: LoadExampleRequest
+    ) -> SendMessageResponse:
+        """
+        Load a knowledge base example directly into a conversation.
+
+        This method:
+        1. Gets KB example by filename
+        2. Creates or retrieves conversation
+        3. Creates user message with example title
+        4. Creates QueryAttempt with generation_ms=0 (marks as pre-loaded)
+        5. Creates assistant message with SQL
+        6. Returns SendMessageResponse
+
+        Args:
+            db: Database session
+            user_id: ID of the authenticated user
+            request: Request with filename and optional conversation_id
+
+        Returns:
+            SendMessageResponse with user and assistant messages
+
+        Raises:
+            ValueError: If KB example not found or conversation access denied
+        """
+        # Step 1: Get KB example by filename
+        example = self.kb.get_example_by_filename(request.filename)
+        if not example:
+            raise ValueError(f"Knowledge base example not found: {request.filename}")
+
+        # Step 2: Get or create conversation
+        if request.conversation_id:
+            conversation = (
+                db.query(Conversation)
+                .filter(
+                    Conversation.id == request.conversation_id,
+                    Conversation.user_id == user_id,
+                )
+                .first()
+            )
+
+            if not conversation:
+                raise ValueError("Conversation not found or access denied")
+        else:
+            # Create new conversation with example title
+            conversation = Conversation(
+                user_id=user_id,
+                title=example.title,
+                is_active=True,
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+
+            logger.info(
+                f"Created new conversation {conversation.id} for KB example",
+                extra={"conversation_id": conversation.id, "user_id": user_id},
+            )
+
+        # Step 3: Create user message with example title
+        user_content = f"Show me: {example.title}"
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=user_content,
+        )
+        db.add(user_message)
+        db.commit()
+        db.refresh(user_message)
+
+        # Step 4: Create QueryAttempt with generation_ms=0 (pre-loaded)
+        query_attempt = QueryAttemptModel(
+            user_id=user_id,
+            natural_language_query=user_content,
+            generated_sql=example.sql,
+            status="not_executed",
+            generated_at=datetime.utcnow(),
+            generation_ms=0,  # Marks as pre-loaded (no LLM tokens used)
+        )
+        db.add(query_attempt)
+        db.commit()
+        db.refresh(query_attempt)
+
+        # Step 5: Create assistant message with SQL
+        assistant_content = f"I've generated the following SQL query:\n\n```sql\n{example.sql}\n```"
+
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=assistant_content,
+            query_attempt_id=query_attempt.id,
+            message_metadata=json.dumps(
+                {
+                    "generation_ms": 0,
+                    "source": "preloaded",
+                    "kb_filename": example.filename,
+                }
+            ),
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        logger.info(
+            f"Loaded KB example '{example.filename}' into conversation {conversation.id}",
+            extra={
+                "conversation_id": conversation.id,
+                "query_attempt_id": query_attempt.id,
+                "kb_filename": example.filename,
+            },
+        )
+
+        # Step 6: Return SendMessageResponse
+        return SendMessageResponse(
+            conversation_id=conversation.id,
+            user_message=self._message_to_response(user_message),
+            assistant_message=self._message_to_response(assistant_message),
+        )
 
     def _get_context_messages(
         self, db: Session, conversation_id: int, exclude_message_id: int | None = None

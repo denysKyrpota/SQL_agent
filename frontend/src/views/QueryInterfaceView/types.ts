@@ -59,11 +59,13 @@ export interface QueryInterfaceState {
 }
 
 /**
- * Example questions configuration
+ * Example question from knowledge base
  */
 export interface ExampleQuestion {
-  text: string;
-  category?: string;
+  title: string;
+  description: string | null;
+  sql: string;
+  filename: string;
 }
 
 /**
@@ -105,8 +107,8 @@ export interface CharacterCountProps {
  * Props for ExampleQuestions component
  */
 export interface ExampleQuestionsProps {
-  examples: string[];
-  onSelect: (example: string) => void;
+  examples: ExampleQuestion[];
+  onSelect: (example: ExampleQuestion) => void;
   disabled: boolean;
 }
 

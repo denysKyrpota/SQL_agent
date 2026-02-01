@@ -243,3 +243,20 @@ class EditMessageRequest(BaseModel):
         json_schema_extra = {
             "example": {"content": "Show me all active customers from the last 30 days"}
         }
+
+
+class LoadExampleRequest(BaseModel):
+    """Request payload for loading a knowledge base example into chat."""
+
+    filename: str = Field(description="Knowledge base example filename")
+    conversation_id: int | None = Field(
+        default=None, description="Conversation ID (if None, creates new conversation)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "drivers_with_current_availability.sql",
+                "conversation_id": 1,
+            }
+        }

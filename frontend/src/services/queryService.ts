@@ -135,6 +135,8 @@ export async function listQueries(
 export interface ExampleQuestion {
   title: string;
   description: string | null;
+  sql: string;
+  filename: string;
 }
 
 /**
