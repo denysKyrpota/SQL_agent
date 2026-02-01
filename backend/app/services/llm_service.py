@@ -362,6 +362,12 @@ QUESTION: "{question}"{context_note}
 
 Write a PostgreSQL SELECT query to answer this question.
 Use proper JOINs based on foreign keys in the schema.
+
+IMPORTANT FORMATTING RULES:
+- Always use FULL TABLE NAMES in SELECT columns (e.g., customer_customer.name, NOT c.name)
+- Always use FULL TABLE NAMES in JOIN conditions (e.g., customer_contract.id = activity_allocation.contract_id)
+- Do NOT use table aliases (like c, cc, aa) - use the complete table name everywhere
+
 Return only the SQL, no explanations."""
 
         return prompt
