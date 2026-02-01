@@ -106,7 +106,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (!sql) return;
 
     try {
-      await navigator.clipboard.writeText(sql);
+      // Try modern clipboard API first (requires HTTPS or localhost)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(sql);
+      } else {
+        // Fallback for HTTP: use textarea + execCommand
+        const textArea = document.createElement('textarea');
+        textArea.value = sql;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (error) {
