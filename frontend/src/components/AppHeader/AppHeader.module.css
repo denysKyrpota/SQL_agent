@@ -55,6 +55,9 @@
   text-decoration: none;
   border-radius: 6px;
   transition: all 0.2s;
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .nav-link:hover {

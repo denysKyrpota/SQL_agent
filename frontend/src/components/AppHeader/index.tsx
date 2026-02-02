@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import styles from './AppHeader.module.css';
 
@@ -12,6 +12,13 @@ const UserIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 
@@ -34,9 +41,21 @@ const AppHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleNewConversation = () => {
+    if (location.pathname === '/') {
+      // Already on home, force reload to reset state
+      window.location.reload();
+    } else {
+      // Navigate to home
+      navigate('/');
+    }
   };
 
   // Close menu when clicking outside
@@ -65,6 +84,10 @@ const AppHeader: React.FC = () => {
             SQL AI
           </Link>
           <nav className={styles['app-header-nav']}>
+            <button onClick={handleNewConversation} className={styles['nav-link']}>
+              <PlusIcon />
+              <span>New Conversation</span>
+            </button>
             <Link to="/history" className={styles['nav-link']}>
               <HistoryIcon />
               <span>Query History</span>
