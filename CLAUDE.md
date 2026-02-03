@@ -114,24 +114,19 @@ The chat system maintains conversation context across messages:
 - Messages link to `query_attempts` when SQL is generated
 - Full conversation history passed to LLM for context-aware generation
 - Supports editing (creates branches) and regeneration (creates siblings)
+- Context window: MAX_CONTEXT_MESSAGES = 10
 
 **Key Flow:**
 ```
 ChatService.send_message()
   ├─> Create/retrieve conversation
   ├─> Store user message
-  ├─> Build conversation history (all previous messages)
-  ├─> QueryService.create_query_attempt(conversation_history=history)
-  │   └─> LLM uses context for refinements ("add WHERE clause", "top 10")
+  ├─> Build conversation history (last 10 messages)
+  ├─> LLMService.select_relevant_tables(conversation_history=history)
+  ├─> LLMService.generate_sql(conversation_history=history)
   ├─> Create query_attempt linked to assistant message
   └─> Return both user and assistant messages
 ```
-
-**Frontend Integration:**
-- Initial state: Centered input form + Example Questions sidebar
-- Chat mode: Activates automatically on first submission
-- ChatPanel: Right sidebar (replaces examples), shows conversation history
-- MessageBubble: Displays messages with SQL code blocks, Execute/Copy buttons
 
 ### Database Schema
 
@@ -141,37 +136,12 @@ ChatService.send_message()
 - `query_attempts` - Complete lifecycle tracking (not_executed → success/failed)
 - `query_results_manifest` - JSON storage, 500 rows/page, 10K export limit
 - `conversations` + `messages` - Chat threads with query linking
-- `schema_snapshots` - PostgreSQL schema cache
 
 **PostgreSQL (Target Database):**
 - Read-only access
 - 279 tables total
 - Schema loaded from JSON snapshots in `data/schema/`
 - Execution timeout: 30 seconds
-
-### Frontend Architecture
-
-**Component Structure:**
-```
-QueryInterfaceView (main orchestrator)
-  ├─> QueryForm (initial centered input)
-  ├─> ChatPanel (conversation UI, right sidebar in chat mode)
-  │   └─> MessageBubble (user/assistant messages, Execute/Copy buttons)
-  ├─> SqlPreviewSection (generated SQL display)
-  └─> ResultsSection (table + pagination + export)
-```
-
-**State Management:**
-- AuthContext (React Context) - Global auth state
-- Local component state - UI interactions
-- SessionStorage - Input persistence across refreshes
-- No Redux/Zustand - Vanilla React patterns
-
-**API Client Pattern:**
-- Centralized `apiClient.ts` with axios
-- Automatic error handling and response transformation
-- Session token via HTTP-only cookies
-- Request/response interceptors for auth
 
 ## Important Code Patterns
 
@@ -196,6 +166,7 @@ async def create_query(request: QueryRequest, db: Session = Depends(get_db)):
 **Critical:** Always await async functions, especially:
 - `LLMService.select_relevant_tables()` - Returns coroutine
 - `LLMService.generate_sql()` - Returns coroutine
+- `LLMService.generate_embedding()` - Returns coroutine
 - `KnowledgeBaseService.find_similar_examples()` - Returns tuple[list[KBExample], float]
 
 ```python
@@ -242,8 +213,6 @@ useEffect(() => {
 }, [initialConversationId]);
 ```
 
-This prevents components from getting stuck with stale initial prop values.
-
 ## Configuration
 
 **Environment Variables (.env):**
@@ -288,10 +257,11 @@ tests/services/      # Service layer tests (query, llm, kb, schema, postgres, ex
 ```
 
 **Key fixtures (conftest.py):**
-- `test_db` - Isolated test database
-- `test_client` - FastAPI TestClient
-- `authenticated_user` - Pre-authenticated test user
-- `admin_user` - Admin user for protected endpoints
+- `test_db` - In-memory SQLite database (function-scoped isolation)
+- `client` - FastAPI TestClient with test DB
+- `authenticated_client` - Pre-authenticated test user
+- `admin_client` - Admin user for protected endpoints
+- `sample_query_attempt`, `executed_query_with_results`, `failed_query` - Query fixtures
 
 **Mock patterns:**
 ```python
@@ -377,9 +347,9 @@ All admin endpoints require admin role authentication.
 
 **Common issues:**
 - Wrong tables selected → Improve table selection prompt
-- Forbidden keywords detected → Check `_is_dangerous_sql()` logic
+- Forbidden keywords detected → Check `_extract_sql_from_response()` validation
 - Timeout → Reduce `POSTGRES_TIMEOUT` or optimize query
-- Rate limit → Implement retry logic or increase quota
+- Rate limit → Retry logic built-in (exponential backoff)
 
 ## Architecture Decision Records
 

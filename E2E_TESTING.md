@@ -94,11 +94,6 @@ npm run test:e2e:report
 
 Use the provided PowerShell script for a guided experience:
 
-```powershell
-# Interactive script that checks if servers are running
-.\run-e2e-manual.ps1
-```
-
 ---
 
 ## Running E2E Tests in CI
