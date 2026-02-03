@@ -12,6 +12,7 @@ A production-ready text-to-SQL application that converts natural language questi
 
 - 🤖 **Intelligent SQL Generation** - Two-stage pipeline for accurate query generation from natural language
 - 💬 **Conversational Interface** - Chat-based UI with context-aware refinements
+- ❓ **Smart Clarification** - Asks specific questions when queries are ambiguous (e.g., "Is 'Olof' a driver or truck name?")
 - 📚 **RAG System** - Knowledge base with semantic search for improved query quality
 - 🔒 **Secure Authentication** - Session-based auth with role-based access control
 - 📊 **Query History** - Track and re-run previous queries
@@ -142,6 +143,7 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 AZURE_OPENAI_API_KEY=your-azure-key
 AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 AZURE_OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_SUPPORTS_TEMPERATURE=false  # Set true if your deployment supports it
 
 # Authentication
 SECRET_KEY=your-secret-key-here-change-in-production
@@ -213,7 +215,18 @@ Access http://localhost:5173 and login with your credentials.
 "List customers who made purchases over $1000"
 ```
 
-### 3. Review Generated SQL
+### 3. Handle Clarifications (if needed)
+
+If your question is ambiguous, the system will ask for clarification:
+
+```
+You: "Show total km for Olof last week"
+Assistant: "Is 'Olof' a driver name or truck name? This will help me search the right table."
+You: "Driver"
+Assistant: [Generates SQL for driver kilometers]
+```
+
+### 4. Review Generated SQL
 
 The system will:
 1. Select relevant tables from your schema
@@ -221,13 +234,13 @@ The system will:
 3. Generate optimized SQL query
 4. Display the query for review
 
-### 4. Execute and View Results
+### 5. Execute and View Results
 
 - Click "Execute" to run the query
 - View paginated results (500 rows per page)
 - Export to CSV (up to 10,000 rows)
 
-### 5. Refine in Chat
+### 6. Refine in Chat
 
 Continue the conversation:
 ```
@@ -336,9 +349,26 @@ See [project_structure.md](project_structure.md) for detailed structure.
 3. Top-3 most similar examples added to context
 4. LLM uses examples to generate accurate SQL
 
+### Smart Clarification
+
+When a query contains ambiguous terms, the system asks targeted questions:
+
+```
+User: "Show km driven by Olof last week"
+Assistant: "Is 'Olof' a driver name or truck name? This will help me search the right table."
+User: "It's a driver"
+Assistant: [Generates SQL querying driver tables]
+```
+
+The clarification system:
+- Analyzes questions for ambiguous terms (names, codes, identifiers)
+- Identifies which entity types they could refer to (driver, truck, customer, etc.)
+- Asks ONE specific question with 2-3 concrete options
+- Uses schema context to suggest relevant possibilities
+
 ### Chat Context
 
-- Maintains full conversation history
+- Maintains conversation history (last 10 messages)
 - LLM receives previous Q&A for context
 - Enables refinements: "add WHERE", "top 10", etc.
 - Supports editing (creates branches) and regeneration
