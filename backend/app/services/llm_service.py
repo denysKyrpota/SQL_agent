@@ -36,9 +36,8 @@ class LLMService:
     def __init__(self):
         """Initialize the LLM service with OpenAI or Azure OpenAI client."""
         self.is_azure = settings.use_azure_openai
-        self._azure_supports_temperature = (
-            True  # Will be set to False if we detect it's not supported
-        )
+        # Use config setting for Azure temperature support (default False to avoid 400 errors)
+        self._azure_supports_temperature = settings.azure_openai_supports_temperature
 
         if self.is_azure:
             # Azure OpenAI configuration

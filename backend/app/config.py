@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     # Azure OpenAI deployment name for embeddings (optional, uses chat deployment if not set)
     azure_openai_embedding_deployment: str = ""
 
+    # Whether Azure deployment supports temperature parameter (many don't)
+    # Set to False to skip temperature and avoid 400 errors on first request
+    azure_openai_supports_temperature: bool = False
+
     @property
     def use_azure_openai(self) -> bool:
         """Check if Azure OpenAI is configured."""
