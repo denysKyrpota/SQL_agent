@@ -23,6 +23,8 @@ class TestServiceInitialization:
         """Test service initialization with valid API key."""
         mock_settings.openai_api_key = "sk-test-key"
         mock_settings.openai_model = "gpt-4"
+        mock_settings.openai_embedding_model = "text-embedding-3-small"
+        mock_settings.use_azure_openai = False  # Ensure we use standard OpenAI
 
         service = LLMService()
 
@@ -192,8 +194,40 @@ GROUP BY u.id, u.username;
 
         response = "I cannot generate a query for that question."
 
-        with pytest.raises(ValueError, match="SELECT statement or use WITH for CTEs"):
+        with pytest.raises(ValueError, match="couldn't generate a SQL query"):
             service._extract_sql_from_response(response)
+
+    def test_extract_sql_clarification_response(self):
+        """Test handling when LLM asks a clarifying question."""
+        service = LLMService()
+
+        response = "Could you please clarify what you mean by 'activities'? Are you looking for today's activities or all activities?"
+
+        # With raise_on_error=True (default), should raise ValueError with the clarification
+        with pytest.raises(ValueError, match="Could you please clarify"):
+            service._extract_sql_from_response(response)
+
+    def test_extract_sql_no_error_mode(self):
+        """Test extract_sql with raise_on_error=False returns tuple."""
+        service = LLMService()
+
+        # Test with valid SQL
+        response = "SELECT * FROM users;"
+        sql, error = service._extract_sql_from_response(response, raise_on_error=False)
+        assert sql == "SELECT * FROM users;"
+        assert error is None
+
+        # Test with invalid response
+        response = "I cannot generate that query."
+        sql, error = service._extract_sql_from_response(response, raise_on_error=False)
+        assert sql is None
+        assert "couldn't generate a SQL query" in error
+
+        # Test with clarification question
+        response = "Could you clarify what you mean?"
+        sql, error = service._extract_sql_from_response(response, raise_on_error=False)
+        assert sql is None
+        assert "Could you clarify" in error
 
 
 class TestSelectRelevantTables:
@@ -217,6 +251,8 @@ class TestSelectRelevantTables:
         """Test successful table selection with mocked OpenAI."""
         mock_settings.openai_api_key = "sk-test"
         mock_settings.openai_model = "gpt-4"
+        mock_settings.openai_embedding_model = "text-embedding-3-small"
+        mock_settings.use_azure_openai = False
 
         service = LLMService()
 
@@ -262,8 +298,10 @@ class TestGenerateSQL:
         """Test successful SQL generation with mocked OpenAI."""
         mock_settings.openai_api_key = "sk-test"
         mock_settings.openai_model = "gpt-4"
+        mock_settings.openai_embedding_model = "text-embedding-3-small"
         mock_settings.openai_max_tokens = 1000
         mock_settings.openai_temperature = 0.0
+        mock_settings.use_azure_openai = False
 
         service = LLMService()
 
@@ -291,8 +329,10 @@ class TestGenerateSQL:
         """Test error when LLM returns invalid response."""
         mock_settings.openai_api_key = "sk-test"
         mock_settings.openai_model = "gpt-4"
+        mock_settings.openai_embedding_model = "text-embedding-3-small"
         mock_settings.openai_max_tokens = 1000
         mock_settings.openai_temperature = 0.0
+        mock_settings.use_azure_openai = False
 
         service = LLMService()
 
@@ -301,7 +341,7 @@ class TestGenerateSQL:
             return_value="I cannot help with that."
         )
 
-        with pytest.raises(ValueError, match="SELECT statement or use WITH for CTEs"):
+        with pytest.raises(ValueError, match="couldn't generate a SQL query"):
             await service.generate_sql(
                 question="Show users",
                 schema_text="Table: users",
