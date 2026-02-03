@@ -273,6 +273,9 @@ class ChatService:
             # Stage 2: Generate SQL with context
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
             schema_text = self.schema.format_schema_for_llm(filtered_schema)
+
+            # Get KB examples (embedding-based search disabled until embedding deployment is configured)
+            # TODO: Enable embedding search by setting AZURE_OPENAI_EMBEDDING_DEPLOYMENT
             similar_kb_examples, _ = await self.kb.find_similar_examples(
                 request.content, top_k=3
             )
@@ -330,6 +333,22 @@ class ChatService:
                     "generation_ms": generation_ms,
                 },
             )
+
+        except ValueError as e:
+            # ValueError indicates a clarification or helpful error message
+            # Store it as an assistant response without QueryAttempt
+            logger.info(f"SQL generation returned clarification: {str(e)}")
+
+            assistant_message = Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                content=str(e),
+                query_attempt_id=None,  # No SQL was generated
+                message_metadata=json.dumps({"type": "clarification"}),
+            )
+            db.add(assistant_message)
+            db.commit()
+            db.refresh(assistant_message)
 
         except Exception as e:
             logger.error(f"Error generating SQL: {str(e)}", exc_info=True)
@@ -422,6 +441,8 @@ class ChatService:
 
             filtered_schema = self.schema.filter_schema_by_tables(selected_tables)
             schema_text = self.schema.format_schema_for_llm(filtered_schema)
+
+            # Get KB examples (embedding-based search disabled until embedding deployment is configured)
             similar_kb_examples, _ = await self.kb.find_similar_examples(
                 user_messages.content, top_k=3
             )
@@ -479,6 +500,25 @@ class ChatService:
                     "original_message_id": message_id,
                 },
             )
+
+            return self._message_to_response(new_message)
+
+        except ValueError as e:
+            # ValueError indicates a clarification or helpful error message
+            logger.info(f"Regeneration returned clarification: {str(e)}")
+
+            new_message = Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                content=str(e),
+                query_attempt_id=None,
+                parent_message_id=message_id,
+                is_regenerated=True,
+                message_metadata=json.dumps({"type": "clarification"}),
+            )
+            db.add(new_message)
+            db.commit()
+            db.refresh(new_message)
 
             return self._message_to_response(new_message)
 

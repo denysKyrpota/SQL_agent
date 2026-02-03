@@ -179,9 +179,12 @@ class LLMService:
                 f"Failed to select tables after 3 attempts for question: {question}.{error_detail}"
             )
             raise ValueError(
-                "Could not identify relevant tables for your question. "
-                "This database contains logistics/transportation data (activities, drivers, vehicles, customers, contracts). "
-                "Try rephrasing with domain-specific terms."
+                "I couldn't identify which tables to query. "
+                "This database contains logistics data (activities, drivers, trucks, customers, contracts). "
+                "Try rephrasing with specific terms like:\n"
+                "- 'Show me all activities from today'\n"
+                "- 'List customers with their contracts'\n"
+                "- 'Find trucks assigned to drivers'"
             )
 
         logger.info(
@@ -359,15 +362,24 @@ SIMILAR EXAMPLES FROM KNOWLEDGE BASE:
 {examples_section}
 QUESTION: "{question}"{context_note}
 
-Write a PostgreSQL SELECT query to answer this question.
-Use proper JOINs based on foreign keys in the schema.
+INSTRUCTIONS:
+1. Write a PostgreSQL SELECT query to answer this question.
+2. Use proper JOINs based on foreign keys in the schema.
+3. If the question is unclear or vague, generate a reasonable query with LIMIT 100.
 
-IMPORTANT FORMATTING RULES:
-- Always use FULL TABLE NAMES in SELECT columns (e.g., customer_customer.name, NOT c.name)
-- Always use FULL TABLE NAMES in JOIN conditions (e.g., customer_contract.id = activity_allocation.contract_id)
-- Do NOT use table aliases (like c, cc, aa) - use the complete table name everywhere
+FORMATTING RULES:
+- Always use FULL TABLE NAMES (e.g., customer_customer.name, NOT c.name)
+- Do NOT use table aliases (like c, cc, aa) - use complete table names everywhere
+- Start with SELECT or WITH (for CTEs)
+- No explanations, markdown, or commentary - ONLY the SQL query
 
-Return only the SQL, no explanations."""
+EXAMPLES OF HANDLING UNCLEAR QUESTIONS:
+- "activities" → SELECT * FROM activity_activity LIMIT 100;
+- "customers" → SELECT * FROM customer_customer LIMIT 100;
+- "show trucks" → SELECT * FROM asset_truck LIMIT 100;
+- "data" → SELECT * FROM activity_activity LIMIT 100;
+
+Return ONLY the SQL query, nothing else."""
 
         return prompt
 
@@ -620,8 +632,12 @@ Return only the SQL, no explanations."""
                 f"Available tables sample: {list(valid_table_names_lower.keys())[:10]}"
             )
             raise ValueError(
-                f"LLM did not return valid table names. Response was: '{response_text[:100]}...'. "
-                f"Please try rephrasing your question."
+                "I couldn't determine which database tables relate to your question. "
+                "This database contains logistics data (activities, drivers, trucks, customers, contracts). "
+                "Try being more specific, for example:\n"
+                "- 'Show me all activities from today'\n"
+                "- 'List customers with their contract counts'\n"
+                "- 'Find trucks assigned to driver John'"
             )
 
         # Remove duplicates while preserving order
@@ -634,7 +650,9 @@ Return only the SQL, no explanations."""
 
         return unique_validated
 
-    def _extract_sql_from_response(self, response_text: str) -> str:
+    def _extract_sql_from_response(
+        self, response_text: str, raise_on_error: bool = True
+    ) -> str | tuple[str | None, str | None]:
         """
         Extract SQL query from LLM response.
 
@@ -642,12 +660,17 @@ Return only the SQL, no explanations."""
 
         Args:
             response_text: Raw response from LLM
+            raise_on_error: If True, raises ValueError on invalid SQL.
+                           If False, returns tuple (sql, error_message).
 
         Returns:
-            str: Extracted SQL query
+            If raise_on_error=True: str (extracted SQL query)
+            If raise_on_error=False: tuple (sql, error_message)
+                - (sql, None) if SQL found
+                - (None, error_message) if no SQL found
 
         Raises:
-            ValueError: If no valid SQL found
+            ValueError: If no valid SQL found and raise_on_error=True
         """
         cleaned = response_text.strip()
 
@@ -692,10 +715,28 @@ Return only the SQL, no explanations."""
         cleaned_upper = cleaned.upper()
         if not (cleaned_upper.startswith("SELECT") or cleaned_upper.startswith("WITH")):
             logger.error(f"Response doesn't start with SELECT or WITH: {cleaned[:100]}")
-            raise ValueError(
-                "Generated query must be a SELECT statement or use WITH for CTEs. "
-                "This system only supports read-only queries. Please rephrase your question to query existing data."
+
+            # Check if LLM is asking a clarifying question or providing explanation
+            question_patterns = ["?", "could you", "can you", "what do you mean", "clarify", "please provide", "i need more"]
+            is_clarification = any(p in response_text.lower() for p in question_patterns)
+
+            if is_clarification:
+                # LLM is asking for clarification - return it as a friendly message
+                clarification_msg = response_text.strip()
+                if raise_on_error:
+                    raise ValueError(clarification_msg)
+                return (None, clarification_msg)
+
+            error_msg = (
+                "I couldn't generate a SQL query for that question. "
+                "Try being more specific, for example:\n"
+                "- 'Show me all activities from today'\n"
+                "- 'List customers with their contract counts'\n"
+                "- 'Find trucks assigned to driver John'"
             )
+            if raise_on_error:
+                raise ValueError(error_msg)
+            return (None, error_msg)
 
         # Check for dangerous commands - use word boundary matching to avoid false positives
         # with column names like "created_at" or table names containing these words
@@ -716,23 +757,31 @@ Return only the SQL, no explanations."""
                 logger.error(
                     f"Response contains dangerous keyword '{keyword}' in DDL/DML context"
                 )
-                raise ValueError(
+                error_msg = (
                     f"The AI attempted to generate a {keyword} operation, which is not allowed. "
                     f"This system only supports SELECT queries to read data, not modify it. "
                     f"Please rephrase your question to ask about existing data (e.g., 'Show me customers that were created...' instead of 'Create customers...')."
                 )
+                if raise_on_error:
+                    raise ValueError(error_msg)
+                return (None, error_msg)
             # Also check for the keyword at the start of a statement
             elif cleaned_upper.strip().startswith(
                 keyword + " "
             ) or cleaned_upper.strip().startswith(keyword + "\n"):
                 logger.error(f"Response starts with dangerous keyword '{keyword}'")
-                raise ValueError(
+                error_msg = (
                     f"The AI attempted to generate a {keyword} operation, which is not allowed. "
                     f"This system only supports SELECT queries to read data, not modify it. "
                     f"Please rephrase your question to ask about existing data (e.g., 'Show me customers that were created...' instead of 'Create customers...')."
                 )
+                if raise_on_error:
+                    raise ValueError(error_msg)
+                return (None, error_msg)
 
-        return cleaned
+        if raise_on_error:
+            return cleaned
+        return (cleaned, None)
 
     async def generate_embedding(self, text: str) -> list[float]:
         """

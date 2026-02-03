@@ -381,8 +381,9 @@ class KnowledgeBaseService:
         embeddings_available = all(ex.embedding is not None for ex in examples)
 
         if not embeddings_available or question_embedding is None:
-            # Fallback: Return all examples without similarity ranking
-            logger.info(f"Embeddings not available, returning first {top_k} examples")
+            # Fallback: Return first examples without similarity ranking
+            # This happens when question_embedding is not provided (embedding deployment not configured)
+            logger.debug(f"Using first {top_k} KB examples (no question embedding provided)")
             return examples[:top_k], 0.0
 
         # Calculate similarity scores for all examples
