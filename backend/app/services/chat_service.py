@@ -26,6 +26,11 @@ from backend.app.schemas.chat import (
 from backend.app.services.llm_service import LLMService
 from backend.app.services.schema_service import SchemaService
 from backend.app.services.knowledge_base_service import KnowledgeBaseService
+from backend.app.services import (
+    llm_service as shared_llm,
+    schema_service as shared_schema,
+    kb_service as shared_kb,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +51,14 @@ class ChatService:
         Initialize the chat service with dependencies.
 
         Args:
-            llm_service: LLM service for SQL generation
-            schema_service: Schema service for database schema
-            kb_service: Knowledge base service for SQL examples
+            llm_service: LLM service for SQL generation (uses shared singleton if not provided)
+            schema_service: Schema service for database schema (uses shared singleton if not provided)
+            kb_service: Knowledge base service for SQL examples (uses shared singleton if not provided)
         """
-        self.llm = llm_service or LLMService()
-        self.schema = schema_service or SchemaService()
-        self.kb = kb_service or KnowledgeBaseService()
+        # Use shared singletons by default to ensure caching works across the app
+        self.llm = llm_service or shared_llm
+        self.schema = schema_service or shared_schema
+        self.kb = kb_service or shared_kb
 
         logger.info("Chat service initialized with all dependencies")
 

@@ -44,7 +44,7 @@ from backend.app.services.query_service import (
     LLMServiceUnavailableError,
     QueryService,
 )
-from backend.app.services.knowledge_base_service import KnowledgeBaseService
+from backend.app.services import kb_service  # Use shared singleton
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,6 @@ router = APIRouter(prefix="/queries", tags=["Queries"])
 query_service = QueryService()
 postgres_service = PostgresExecutionService()
 export_service = ExportService()
-
-kb_service = KnowledgeBaseService()
 
 
 # ============================================================================
