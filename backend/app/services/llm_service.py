@@ -288,7 +288,8 @@ Example: activity_activity, asset_truck, asset_assignment"""
                 "role": "system",
                 "content": (
                     "You are a PostgreSQL expert. Generate SELECT queries based on the schema provided. "
-                    "Return only the SQL query, no explanations or markdown."
+                    "If you can generate a query, return only the SQL. "
+                    "If you need more information, ask ONE specific clarifying question."
                 ),
             }
         ]
@@ -312,9 +313,31 @@ Example: activity_activity, asset_truck, asset_assignment"""
             f"Stage 2 raw LLM response: {response_text[:1500] if response_text else 'EMPTY'}"
         )
 
-        # Extract SQL from response
-        sql = self._extract_sql_from_response(response_text)
+        # Extract SQL from response (don't raise on error so we can handle it)
+        result = self._extract_sql_from_response(response_text, raise_on_error=False)
 
+        if isinstance(result, tuple):
+            sql, error_msg = result
+            if sql is not None:
+                logger.info(f"Stage 2 complete: Generated SQL ({len(sql)} characters)")
+                logger.debug(f"Generated SQL: {sql}")
+                return sql
+
+            # Check if error is already a clarification question from LLM
+            if error_msg and "?" in error_msg and not error_msg.startswith("I couldn't"):
+                # LLM asked a clarifying question - pass it through
+                logger.info(f"LLM requested clarification: {error_msg[:100]}")
+                raise ValueError(error_msg)
+
+            # Generic error - generate a specific clarifying question
+            logger.info("Generating clarifying question for unclear request")
+            clarifying_question = await self._generate_clarifying_question(
+                question, schema_text
+            )
+            raise ValueError(clarifying_question)
+
+        # Result is a string (SQL)
+        sql = result
         logger.info(f"Stage 2 complete: Generated SQL ({len(sql)} characters)")
         logger.debug(f"Generated SQL: {sql}")
 
@@ -365,23 +388,98 @@ QUESTION: "{question}"{context_note}
 INSTRUCTIONS:
 1. Write a PostgreSQL SELECT query to answer this question.
 2. Use proper JOINs based on foreign keys in the schema.
-3. If the question is unclear or vague, generate a reasonable query with LIMIT 100.
+3. If the question is clear enough, generate the query even if imperfect.
+4. If you truly cannot determine what data the user wants, ask ONE specific clarifying question.
 
 FORMATTING RULES:
 - Always use FULL TABLE NAMES (e.g., customer_customer.name, NOT c.name)
 - Do NOT use table aliases (like c, cc, aa) - use complete table names everywhere
 - Start with SELECT or WITH (for CTEs)
-- No explanations, markdown, or commentary - ONLY the SQL query
 
-EXAMPLES OF HANDLING UNCLEAR QUESTIONS:
-- "activities" → SELECT * FROM activity_activity LIMIT 100;
-- "customers" → SELECT * FROM customer_customer LIMIT 100;
-- "show trucks" → SELECT * FROM asset_truck LIMIT 100;
-- "data" → SELECT * FROM activity_activity LIMIT 100;
+RESPONSE FORMAT:
+- If you CAN generate a query: Return ONLY the SQL, no explanations
+- If you CANNOT generate a query: Ask a specific question about what's missing
 
-Return ONLY the SQL query, nothing else."""
+EXAMPLES OF CLARIFYING QUESTIONS (only when truly needed):
+- "Which customer are you asking about? Please provide a customer name or ID."
+- "What date range should I use for the activities? (e.g., 'last 7 days', 'January 2024')"
+- "Do you want to see all trucks, or only those assigned to a specific driver?"
+- "What information about contracts do you need? (e.g., status, value, customer, dates)"
+
+DO NOT ask clarifying questions for simple requests like:
+- "show customers" → SELECT * FROM customer_customer LIMIT 100;
+- "list activities" → SELECT * FROM activity_activity LIMIT 100;
+- "trucks" → SELECT * FROM asset_truck LIMIT 100;"""
 
         return prompt
+
+    async def _generate_clarifying_question(
+        self, question: str, schema_text: str
+    ) -> str:
+        """
+        Generate a specific clarifying question when the user's request is unclear.
+
+        Called as a fallback when SQL generation fails and the LLM didn't
+        already ask a clarifying question.
+
+        Args:
+            question: The user's original question
+            schema_text: The filtered database schema
+
+        Returns:
+            str: A specific clarifying question to ask the user
+        """
+        # Extract table names from schema for context
+        table_names = []
+        for line in schema_text.split("\n"):
+            if line.startswith("Table: "):
+                table_names.append(line.replace("Table: ", "").strip())
+
+        tables_summary = ", ".join(table_names[:10])
+        if len(table_names) > 10:
+            tables_summary += f" (and {len(table_names) - 10} more)"
+
+        prompt = f"""The user asked: "{question}"
+
+Available tables: {tables_summary}
+
+The request is unclear. Generate ONE specific clarifying question to help understand what data they need.
+
+Rules:
+- Ask about ONE specific missing piece of information
+- Mention relevant table/column options when helpful
+- Keep it concise (1-2 sentences max)
+- Be friendly and helpful
+
+Examples of good clarifying questions:
+- "Which customer are you looking for? You can search by name or ID."
+- "What time period should I include? (e.g., 'last week', 'January 2024')"
+- "Do you want to see all activities, or filter by status (completed, pending, etc.)?"
+
+Return ONLY the clarifying question, nothing else."""
+
+        messages = [
+            {
+                "role": "system",
+                "content": "You help users clarify their database queries. Ask specific, helpful questions.",
+            },
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            response = await self._call_openai_with_retry(
+                messages=messages,
+                max_tokens=150,
+                temperature=0.3,  # Slightly creative for natural questions
+            )
+            return response.strip()
+        except Exception as e:
+            logger.error(f"Failed to generate clarifying question: {e}")
+            # Fallback to a generic but helpful question
+            return (
+                f"I'd like to help, but I need more details. "
+                f"What specific information are you looking for from {tables_summary}?"
+            )
 
     async def _call_openai_with_retry(
         self,

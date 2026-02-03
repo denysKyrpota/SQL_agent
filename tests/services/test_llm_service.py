@@ -326,7 +326,7 @@ class TestGenerateSQL:
     @pytest.mark.asyncio
     @patch('backend.app.services.llm_service.settings')
     async def test_generate_sql_invalid_response(self, mock_settings):
-        """Test error when LLM returns invalid response."""
+        """Test that invalid response triggers clarifying question generation."""
         mock_settings.openai_api_key = "sk-test"
         mock_settings.openai_model = "gpt-4"
         mock_settings.openai_embedding_model = "text-embedding-3-small"
@@ -341,12 +341,20 @@ class TestGenerateSQL:
             return_value="I cannot help with that."
         )
 
-        with pytest.raises(ValueError, match="couldn't generate a SQL query"):
+        # Mock the clarifying question generator
+        service._generate_clarifying_question = AsyncMock(
+            return_value="What specific user information do you need?"
+        )
+
+        with pytest.raises(ValueError, match="What specific user information"):
             await service.generate_sql(
                 question="Show users",
                 schema_text="Table: users",
                 examples=[]
             )
+
+        # Verify clarifying question generator was called
+        service._generate_clarifying_question.assert_called_once()
 
 
 class TestBuildSQLGenerationPrompt:
