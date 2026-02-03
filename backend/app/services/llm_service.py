@@ -428,7 +428,8 @@ DO NOT ask clarifying questions for simple requests like:
         Generate a specific clarifying question when the user's request is unclear.
 
         Called as a fallback when SQL generation fails and the LLM didn't
-        already ask a clarifying question.
+        already ask a clarifying question. Analyzes the question for ambiguous
+        terms and suggests what entity types they might refer to.
 
         Args:
             question: The user's original question
@@ -437,46 +438,88 @@ DO NOT ask clarifying questions for simple requests like:
         Returns:
             str: A specific clarifying question to ask the user
         """
-        # Extract table names from schema for context
-        table_names = []
+        # Extract table and column info for context
+        tables_with_columns = []
+        current_table = None
+        name_columns = []  # Track columns that might contain names/identifiers
+
         for line in schema_text.split("\n"):
             if line.startswith("Table: "):
-                table_names.append(line.replace("Table: ", "").strip())
+                current_table = line.replace("Table: ", "").strip()
+                tables_with_columns.append(current_table)
+            elif current_table and " - " in line:
+                # Extract column name
+                col_info = line.strip().lstrip("- ")
+                col_name = col_info.split(" ")[0] if col_info else ""
+                # Track name/identifier columns for disambiguation
+                if col_name and any(
+                    n in col_name.lower()
+                    for n in ["name", "code", "number", "plate", "identifier"]
+                ):
+                    entity = current_table.split("_")[-1]  # e.g., "asset_driver" -> "driver"
+                    name_columns.append(f"{entity}.{col_name}")
 
-        tables_summary = ", ".join(table_names[:10])
-        if len(table_names) > 10:
-            tables_summary += f" (and {len(table_names) - 10} more)"
+        # Create a summary of searchable entities
+        entity_types = set()
+        for table in tables_with_columns:
+            # Extract entity type from table name (e.g., "asset_driver" -> "driver")
+            parts = table.split("_")
+            if len(parts) >= 2:
+                entity_types.add(parts[-1])  # truck, driver, customer, activity, etc.
 
-        prompt = f"""The user asked: "{question}"
+        entities_list = ", ".join(sorted(entity_types)[:8])
+        name_fields_summary = ", ".join(name_columns[:10])
 
-Available tables: {tables_summary}
+        prompt = f"""USER'S QUESTION: "{question}"
 
-The request is unclear. Generate ONE specific clarifying question to help understand what data they need.
+DATABASE CONTEXT:
+- Available entity types: {entities_list}
+- Searchable name/ID fields: {name_fields_summary}
 
-Rules:
-- Ask about ONE specific missing piece of information
-- Mention relevant table/column options when helpful
-- Keep it concise (1-2 sentences max)
-- Be friendly and helpful
+TASK: Identify what's unclear in the user's question and ask ONE specific clarifying question.
 
-Examples of good clarifying questions:
-- "Which customer are you looking for? You can search by name or ID."
-- "What time period should I include? (e.g., 'last week', 'January 2024')"
-- "Do you want to see all activities, or filter by status (completed, pending, etc.)?"
+ANALYSIS STEPS:
+1. Look for ambiguous terms (names, codes, identifiers) that could refer to multiple entity types
+2. Check if the user mentioned a specific value (like "Olof", "ABC123") without specifying what type of entity it is
+3. Identify if the data type being requested is unclear
 
-Return ONLY the clarifying question, nothing else."""
+EXAMPLES OF GOOD CLARIFYING QUESTIONS:
+
+If user asks "show data for Olof":
+→ "Is 'Olof' a driver name, truck name, or customer name? This will help me search the right table."
+
+If user asks "km driven last week":
+→ "Do you want to see kilometers for a specific driver, truck, or all vehicles combined?"
+
+If user asks "show contract ABC":
+→ "I found 'ABC' - is this a contract number, customer code, or something else?"
+
+If user asks "activities for John":
+→ "Is 'John' a driver name or customer name? I can search either one."
+
+RULES:
+- Identify the SPECIFIC ambiguous term from the question
+- Offer 2-3 concrete options for what it might be (driver, truck, customer, etc.)
+- Keep it to 1-2 sentences
+- Be helpful and conversational
+
+Return ONLY the clarifying question:"""
 
         messages = [
             {
                 "role": "system",
-                "content": "You help users clarify their database queries. Ask specific, helpful questions.",
+                "content": (
+                    "You analyze database queries to identify ambiguous terms. "
+                    "When users mention names or codes without context, ask which "
+                    "entity type they mean (driver, truck, customer, etc.)."
+                ),
             },
             {"role": "user", "content": prompt},
         ]
 
         fallback_question = (
-            f"I'd like to help with your question about '{question[:50]}{'...' if len(question) > 50 else ''}'. "
-            f"Could you provide more details about what specific data you're looking for?"
+            f"I found '{question[:30]}' but I'm not sure what type of data you're looking for. "
+            f"Could you specify if this relates to a driver, truck, customer, or activity?"
         )
 
         try:
