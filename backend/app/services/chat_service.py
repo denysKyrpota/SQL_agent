@@ -337,12 +337,24 @@ class ChatService:
         except ValueError as e:
             # ValueError indicates a clarification or helpful error message
             # Store it as an assistant response without QueryAttempt
-            logger.info(f"SQL generation returned clarification: {str(e)}")
+            clarification_content = str(e).strip()
+
+            # Ensure we never store an empty message
+            if not clarification_content:
+                clarification_content = (
+                    "I'm having trouble understanding your request. "
+                    "Could you please rephrase your question with more details?"
+                )
+                logger.warning("Received empty clarification, using fallback message")
+            else:
+                logger.info(
+                    f"SQL generation returned clarification: {clarification_content[:100]}..."
+                )
 
             assistant_message = Message(
                 conversation_id=conversation.id,
                 role="assistant",
-                content=str(e),
+                content=clarification_content,
                 query_attempt_id=None,  # No SQL was generated
                 message_metadata=json.dumps({"type": "clarification"}),
             )
@@ -505,12 +517,24 @@ class ChatService:
 
         except ValueError as e:
             # ValueError indicates a clarification or helpful error message
-            logger.info(f"Regeneration returned clarification: {str(e)}")
+            clarification_content = str(e).strip()
+
+            # Ensure we never store an empty message
+            if not clarification_content:
+                clarification_content = (
+                    "I'm having trouble understanding your request. "
+                    "Could you please rephrase your question with more details?"
+                )
+                logger.warning("Received empty clarification, using fallback message")
+            else:
+                logger.info(
+                    f"Regeneration returned clarification: {clarification_content[:100]}..."
+                )
 
             new_message = Message(
                 conversation_id=conversation.id,
                 role="assistant",
-                content=str(e),
+                content=clarification_content,
                 query_attempt_id=None,
                 parent_message_id=message_id,
                 is_regenerated=True,

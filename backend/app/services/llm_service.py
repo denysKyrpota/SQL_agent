@@ -313,6 +313,14 @@ Example: activity_activity, asset_truck, asset_assignment"""
             f"Stage 2 raw LLM response: {response_text[:1500] if response_text else 'EMPTY'}"
         )
 
+        # Handle empty response from LLM
+        if not response_text or not response_text.strip():
+            logger.warning("LLM returned empty response for SQL generation")
+            clarifying_question = await self._generate_clarifying_question(
+                question, schema_text
+            )
+            raise ValueError(clarifying_question)
+
         # Extract SQL from response (don't raise on error so we can handle it)
         result = self._extract_sql_from_response(response_text, raise_on_error=False)
 
@@ -466,20 +474,30 @@ Return ONLY the clarifying question, nothing else."""
             {"role": "user", "content": prompt},
         ]
 
+        fallback_question = (
+            f"I'd like to help with your question about '{question[:50]}{'...' if len(question) > 50 else ''}'. "
+            f"Could you provide more details about what specific data you're looking for?"
+        )
+
         try:
             response = await self._call_openai_with_retry(
                 messages=messages,
                 max_tokens=150,
                 temperature=0.3,  # Slightly creative for natural questions
             )
-            return response.strip()
+            clarifying_q = response.strip()
+
+            # Ensure we never return an empty response
+            if not clarifying_q:
+                logger.warning("LLM returned empty clarifying question, using fallback")
+                return fallback_question
+
+            logger.debug(f"Generated clarifying question: {clarifying_q}")
+            return clarifying_q
+
         except Exception as e:
             logger.error(f"Failed to generate clarifying question: {e}")
-            # Fallback to a generic but helpful question
-            return (
-                f"I'd like to help, but I need more details. "
-                f"What specific information are you looking for from {tables_summary}?"
-            )
+            return fallback_question
 
     async def _call_openai_with_retry(
         self,
