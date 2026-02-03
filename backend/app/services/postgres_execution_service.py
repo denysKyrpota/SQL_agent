@@ -225,8 +225,12 @@ class PostgresExecutionService:
         try:
             engine = self._get_engine()
 
-            # Execute query with timeout
-            with engine.connect().execution_options(timeout=timeout) as connection:
+            # Execute query with PostgreSQL statement timeout
+            with engine.connect() as connection:
+                # Set PostgreSQL statement timeout (in milliseconds)
+                timeout_ms = timeout * 1000
+                connection.execute(text(f"SET statement_timeout = {timeout_ms}"))
+
                 result = connection.execute(text(sql))
 
                 # Fetch all rows
@@ -239,7 +243,10 @@ class PostgresExecutionService:
                 rows_data = [list(row) for row in rows]
 
         except OperationalError as e:
-            if "timeout" in str(e).lower():
+            error_str = str(e).lower()
+            # Check for PostgreSQL timeout/cancellation errors
+            # Error code 57014 = query_canceled (statement timeout)
+            if "timeout" in error_str or "cancel" in error_str or "57014" in str(e):
                 logger.warning(f"Query timeout after {timeout}s")
                 raise QueryTimeoutError(
                     f"Query execution exceeded {timeout} second timeout. "
