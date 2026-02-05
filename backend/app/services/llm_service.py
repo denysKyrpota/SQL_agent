@@ -1014,6 +1014,88 @@ Return ONLY the clarifying question:"""
                 f"Failed to generate embedding: {e}"
             ) from e
 
+    async def generate_embeddings_batch(
+        self, texts: list[str], batch_size: int = 20
+    ) -> list[list[float]]:
+        """
+        Generate embeddings for multiple texts in batches.
+
+        More efficient than calling generate_embedding() multiple times.
+        OpenAI's API supports up to 2048 inputs per request, but we use
+        smaller batches for better error handling and progress tracking.
+
+        Args:
+            texts: List of texts to generate embeddings for
+            batch_size: Number of texts per API call (default: 20)
+
+        Returns:
+            list[list[float]]: List of embedding vectors in same order as input
+
+        Raises:
+            LLMServiceUnavailableError: If OpenAI API fails
+
+        Example:
+            >>> service = LLMService()
+            >>> texts = ["query 1", "query 2", "query 3"]
+            >>> embeddings = await service.generate_embeddings_batch(texts)
+            >>> len(embeddings)
+            3
+        """
+        client = self.embedding_client or self.client
+
+        if not client:
+            raise LLMServiceUnavailableError(
+                "No embedding client configured. Set AZURE_OPENAI_EMBEDDING_ENDPOINT, "
+                "AZURE_OPENAI_EMBEDDING_API_KEY, and AZURE_OPENAI_EMBEDDING_DEPLOYMENT "
+                "in your .env file."
+            )
+
+        if not texts:
+            return []
+
+        logger.info(
+            f"Generating embeddings for {len(texts)} texts in batches of {batch_size}"
+        )
+
+        all_embeddings = []
+        total_tokens = 0
+
+        # Process in batches
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (len(texts) + batch_size - 1) // batch_size
+
+            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} texts)")
+
+            try:
+                response = await client.embeddings.create(
+                    model=self.embedding_model, input=batch
+                )
+
+                # Extract embeddings in order
+                batch_embeddings = [list(item.embedding) for item in response.data]
+                all_embeddings.extend(batch_embeddings)
+                total_tokens += response.usage.total_tokens
+
+                logger.debug(
+                    f"Batch {batch_num} complete: {len(batch_embeddings)} embeddings, "
+                    f"{response.usage.total_tokens} tokens"
+                )
+
+            except Exception as e:
+                logger.error(f"Error in batch {batch_num}: {e}", exc_info=True)
+                raise LLMServiceUnavailableError(
+                    f"Failed to generate embeddings for batch {batch_num}: {e}"
+                ) from e
+
+        logger.info(
+            f"Batch embedding complete: {len(all_embeddings)} embeddings, "
+            f"{total_tokens} total tokens"
+        )
+
+        return all_embeddings
+
 
 class LLMServiceUnavailableError(Exception):
     """Raised when OpenAI API is unavailable after retries."""

@@ -25,7 +25,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/embeddings/generate")
 async def generate_embeddings(
-    user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    force: bool = False,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """
     Generate embeddings for all knowledge base examples.
@@ -35,6 +37,9 @@ async def generate_embeddings(
     - When new examples are added to the knowledge base
     - If embeddings become corrupted or outdated
 
+    Query Parameters:
+        force: If true, regenerate all embeddings even if they exist (default: false)
+
     Requires admin role.
 
     Returns:
@@ -42,7 +47,10 @@ async def generate_embeddings(
             - total_examples: Number of examples in KB
             - embeddings_generated: Number of new embeddings created
             - embeddings_skipped: Number of examples that already had embeddings
+            - embeddings_failed: Number of examples that failed to generate
             - embeddings_available: Total examples with embeddings after generation
+            - tables_found: Unique tables referenced in KB examples
+            - used_batch_api: Whether batch API was used for efficiency
     """
     # Check if user is admin
     if user.get("role") != "admin":
@@ -51,7 +59,8 @@ async def generate_embeddings(
         )
 
     logger.info(
-        f"Admin {user['username']} (ID: {user['id']}) requested embedding generation"
+        f"Admin {user['username']} (ID: {user['id']}) requested embedding generation "
+        f"(force={force})"
     )
 
     try:
@@ -59,8 +68,12 @@ async def generate_embeddings(
         llm_service = LLMService()
         kb_service = KnowledgeBaseService()
 
-        # Generate embeddings
-        stats = await kb_service.generate_embeddings(llm_service)
+        # Generate embeddings with new options
+        stats = await kb_service.generate_embeddings(
+            llm_service,
+            force_regenerate=force,
+            use_batch=True,
+        )
 
         logger.info(
             f"Embedding generation complete: {stats}",
@@ -69,7 +82,8 @@ async def generate_embeddings(
 
         return {
             "success": True,
-            "message": "Embeddings generated successfully",
+            "message": f"Embeddings generated successfully "
+            f"({stats['embeddings_generated']} new, {stats['embeddings_skipped']} skipped)",
             "stats": stats,
         }
 

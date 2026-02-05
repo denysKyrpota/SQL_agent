@@ -470,66 +470,198 @@ class KnowledgeBaseService:
         except Exception as e:
             logger.warning(f"Failed to load embeddings: {e}")
 
-    async def generate_embeddings(self, llm_service) -> dict[str, Any]:
+    def _extract_tables_from_sql(self, sql: str) -> list[str]:
+        """
+        Extract table names from SQL query.
+
+        Args:
+            sql: SQL query string
+
+        Returns:
+            list[str]: List of table names found in the query
+        """
+        # Match table names after FROM, JOIN, INTO, UPDATE keywords
+        patterns = [
+            r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+            r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+            r'\bINTO\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+            r'\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+        ]
+
+        tables = set()
+        for pattern in patterns:
+            matches = re.findall(pattern, sql, re.IGNORECASE)
+            tables.update(matches)
+
+        return sorted(tables)
+
+    def _build_embedding_text(self, example: KBExample) -> str:
+        """
+        Build optimized text for embedding generation.
+
+        Creates question-like text that better matches how users ask questions.
+        This improves semantic similarity matching.
+
+        Args:
+            example: Knowledge base example
+
+        Returns:
+            str: Text optimized for embedding
+        """
+        # Extract tables from SQL for context
+        tables = self._extract_tables_from_sql(example.sql)
+        tables_str = ", ".join(tables) if tables else "database"
+
+        # Build question-like text that matches user queries
+        # Format: "Question about [topic] involving [tables]"
+        description = example.description or f"Query to {example.title.lower()}"
+
+        embedding_text = f"""Question: {example.title}
+Description: {description}
+Tables involved: {tables_str}
+This query helps answer questions about: {example.title.lower()}"""
+
+        return embedding_text
+
+    async def generate_embeddings(
+        self,
+        llm_service,
+        force_regenerate: bool = False,
+        use_batch: bool = True,
+    ) -> dict[str, Any]:
         """
         Generate embeddings for all examples using OpenAI.
 
-        This should be called once initially or when new examples are added.
+        Uses batch API for efficiency and generates question-like text
+        for better semantic matching with user queries.
 
         Args:
             llm_service: LLMService instance for generating embeddings
+            force_regenerate: If True, regenerate all embeddings even if they exist
+            use_batch: If True, use batch API for efficiency (default: True)
 
         Returns:
-            dict: Statistics about embedding generation
+            dict: Statistics about embedding generation including:
+                - total_examples: Total number of KB examples
+                - embeddings_generated: Number of new embeddings created
+                - embeddings_skipped: Number skipped (already existed)
+                - embeddings_failed: Number that failed to generate
+                - embeddings_available: Total embeddings now available
+                - tables_found: Unique tables referenced in examples
 
         Example:
             >>> from backend.app.services.llm_service import LLMService
             >>> kb_service = KnowledgeBaseService()
             >>> llm_service = LLMService()
-            >>> stats = await kb_service.generate_embeddings(llm_service)
+            >>> stats = await kb_service.generate_embeddings(llm_service, force_regenerate=True)
             >>> print(f"Generated {stats['embeddings_generated']} embeddings")
         """
         examples = self.get_examples()
 
-        embeddings_generated = 0
+        if not examples:
+            logger.warning("No examples found in knowledge base")
+            return {
+                "total_examples": 0,
+                "embeddings_generated": 0,
+                "embeddings_skipped": 0,
+                "embeddings_failed": 0,
+                "embeddings_available": 0,
+                "tables_found": [],
+            }
+
+        # Determine which examples need embeddings
+        examples_to_embed = []
         embeddings_skipped = 0
 
-        logger.info(f"Generating embeddings for {len(examples)} examples")
-
         for example in examples:
-            if example.embedding is not None:
+            if example.embedding is not None and not force_regenerate:
                 logger.debug(f"Skipping {example.filename} (already has embedding)")
                 embeddings_skipped += 1
-                continue
+            else:
+                examples_to_embed.append(example)
 
+        if not examples_to_embed:
+            logger.info("All examples already have embeddings, nothing to generate")
+            return {
+                "total_examples": len(examples),
+                "embeddings_generated": 0,
+                "embeddings_skipped": embeddings_skipped,
+                "embeddings_failed": 0,
+                "embeddings_available": len(examples),
+                "tables_found": list(set(
+                    table for ex in examples
+                    for table in self._extract_tables_from_sql(ex.sql)
+                )),
+            }
+
+        logger.info(
+            f"Generating embeddings for {len(examples_to_embed)} examples "
+            f"({'force regenerate' if force_regenerate else 'new only'})"
+        )
+
+        # Build embedding texts with question-like format
+        texts_to_embed = []
+        for example in examples_to_embed:
+            text = self._build_embedding_text(example)
+            texts_to_embed.append(text)
+            logger.debug(f"Embedding text for {example.filename}: {text[:100]}...")
+
+        embeddings_generated = 0
+        embeddings_failed = 0
+
+        if use_batch and len(texts_to_embed) > 1:
+            # Use batch API for efficiency
             try:
-                # Generate embedding from example's SQL + title + description
-                text_to_embed = (
-                    f"{example.title}\n{example.description or ''}\n{example.sql}"
-                )
+                logger.info(f"Using batch API to generate {len(texts_to_embed)} embeddings")
+                embeddings = await llm_service.generate_embeddings_batch(texts_to_embed)
 
-                embedding = await llm_service.generate_embedding(text_to_embed)
-                example.embedding = embedding
-                embeddings_generated += 1
-
-                logger.info(f"Generated embedding for {example.filename}")
+                # Assign embeddings to examples
+                for example, embedding in zip(examples_to_embed, embeddings):
+                    example.embedding = embedding
+                    embeddings_generated += 1
+                    logger.info(f"Generated embedding for {example.filename}")
 
             except Exception as e:
-                logger.error(
-                    f"Failed to generate embedding for {example.filename}: {e}"
-                )
-                continue
+                logger.error(f"Batch embedding failed: {e}")
+                # Fall back to individual embedding generation
+                logger.info("Falling back to individual embedding generation")
+                use_batch = False
+
+        if not use_batch or embeddings_generated == 0:
+            # Generate embeddings one at a time
+            for example, text in zip(examples_to_embed, texts_to_embed):
+                try:
+                    embedding = await llm_service.generate_embedding(text)
+                    example.embedding = embedding
+                    embeddings_generated += 1
+                    logger.info(f"Generated embedding for {example.filename}")
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to generate embedding for {example.filename}: {e}"
+                    )
+                    embeddings_failed += 1
+                    continue
 
         # Save embeddings to disk
         self.save_embeddings()
+
+        # Collect all unique tables
+        all_tables = set()
+        for example in examples:
+            all_tables.update(self._extract_tables_from_sql(example.sql))
 
         stats = {
             "total_examples": len(examples),
             "embeddings_generated": embeddings_generated,
             "embeddings_skipped": embeddings_skipped,
+            "embeddings_failed": embeddings_failed,
             "embeddings_available": sum(
                 1 for ex in examples if ex.embedding is not None
             ),
+            "tables_found": sorted(all_tables),
+            "force_regenerate": force_regenerate,
+            "used_batch_api": use_batch and embeddings_generated > 0,
         }
 
         logger.info(f"Embedding generation complete: {stats}")
