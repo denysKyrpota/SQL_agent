@@ -81,16 +81,18 @@ const QueryForm: React.FC<QueryFormProps> = ({
         )}
       </div>
 
-      <div className={styles['form-actions']}>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={isSubmitDisabled}
-          loading={disabled}
-        >
-          Generate SQL
-        </Button>
-      </div>
+      {/* Hide button when loading - LoadingIndicator shows progress instead */}
+      {!disabled && (
+        <div className={styles['form-actions']}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitDisabled}
+          >
+            Generate SQL
+          </Button>
+        </div>
+      )}
     </form>
   );
 };
