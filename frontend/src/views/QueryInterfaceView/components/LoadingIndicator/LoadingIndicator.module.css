@@ -1,5 +1,5 @@
 /* LoadingIndicator Styles */
-.loading-indicator {
+.loadingIndicator {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23,13 +23,35 @@
   }
 }
 
-.loading-text {
+.loadingText {
   margin-top: 1rem;
   font-size: 1rem;
   color: #6b7280;
+  min-height: 1.5rem;
+  transition: opacity 0.3s ease;
 }
 
-.sr-only {
+/* Progress dots */
+.progressDots {
+  display: flex;
+  gap: 8px;
+  margin-top: 1rem;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.dotActive {
+  background-color: #3b82f6;
+  transform: scale(1.2);
+}
+
+.srOnly {
   position: absolute;
   width: 1px;
   height: 1px;
