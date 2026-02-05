@@ -169,7 +169,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               disabled={isRegenerating}
               className={styles.actionButton}
             >
-              {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+              {isRegenerating ? (
+                <span className={styles.regeneratingContent}>
+                  <span className={styles.smallSpinner} />
+                  Regenerating...
+                </span>
+              ) : (
+                'Regenerate'
+              )}
             </Button>
           )}
 
