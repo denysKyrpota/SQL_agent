@@ -49,6 +49,7 @@ async def main(force: bool = False):
 
     # Check for either OpenAI or Azure OpenAI configuration
     use_azure = settings.use_azure_openai
+    has_separate_embedding = settings.has_separate_embedding_endpoint
 
     if use_azure:
         if not settings.azure_openai_api_key or not settings.azure_openai_endpoint:
@@ -57,14 +58,26 @@ async def main(force: bool = False):
             print("Please set in your .env file:")
             print("  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com")
             print("  AZURE_OPENAI_API_KEY=your-api-key")
-            print("  AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your-embedding-deployment")
+            print("  AZURE_OPENAI_DEPLOYMENT=your-chat-deployment")
+            print()
+            print("For embeddings (can be separate endpoint):")
+            print("  AZURE_OPENAI_EMBEDDING_ENDPOINT=https://your-embedding-resource.openai.azure.com")
+            print("  AZURE_OPENAI_EMBEDDING_API_KEY=your-embedding-api-key")
+            print("  AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small")
             print()
             return 1
 
-        embedding_model = settings.azure_openai_embedding_deployment or settings.azure_openai_deployment
         print(f"✓ Azure OpenAI configured")
-        print(f"✓ Endpoint: {settings.azure_openai_endpoint}")
-        print(f"✓ Embedding deployment: {embedding_model}")
+        print(f"  Chat endpoint: {settings.azure_openai_endpoint}")
+        print(f"  Chat deployment: {settings.azure_openai_deployment}")
+
+        if has_separate_embedding:
+            print(f"✓ Separate embedding endpoint configured")
+            print(f"  Embedding endpoint: {settings.azure_openai_embedding_endpoint}")
+            print(f"  Embedding deployment: {settings.azure_openai_embedding_deployment}")
+        else:
+            embedding_model = settings.azure_openai_embedding_deployment or settings.azure_openai_deployment
+            print(f"  Embedding deployment: {embedding_model} (same endpoint)")
     else:
         if not settings.openai_api_key:
             print("❌ ERROR: OPENAI_API_KEY not configured")
@@ -112,45 +125,54 @@ async def main(force: bool = False):
 
     # Check if any embeddings need to be generated
     missing_embeddings = sum(1 for ex in examples if ex.embedding is None)
+    has_embeddings = len(examples) - missing_embeddings
 
     if missing_embeddings == 0:
         print("✓ All examples already have embeddings!")
         print()
         if not force:
-            response = input("Regenerate all embeddings? (y/N): ")
+            response = input("Regenerate all embeddings with improved format? (y/N): ")
             if response.lower() != 'y':
                 print("Skipping embedding generation")
+                print()
+                print("Tip: Use --force to regenerate with the new question-like format")
+                print("     for better semantic matching with user queries.")
                 return 0
-        else:
-            print("--force specified, regenerating all embeddings")
-
-        # Clear existing embeddings
-        for example in examples:
-            example.embedding = None
-        missing_embeddings = len(examples)
+        print("Will regenerate all embeddings with improved format")
+        print()
 
     # Confirm generation
     print(f"📊 Summary:")
     print(f"   Total examples: {len(examples)}")
+    print(f"   Already have embeddings: {has_embeddings}")
     print(f"   Need embeddings: {missing_embeddings}")
+    if force:
+        print(f"   Mode: Force regenerate ALL ({len(examples)} examples)")
+    else:
+        print(f"   Mode: Generate missing only ({missing_embeddings} examples)")
     print()
 
-    if not force:
+    if not force and missing_embeddings > 0:
         response = input(f"Generate embeddings for {missing_embeddings} examples? (Y/n): ")
         if response.lower() == 'n':
             print("Cancelled")
             return 0
-    else:
-        print("--force specified, proceeding without confirmation")
+    elif force:
+        print("--force specified, regenerating all embeddings")
     print()
 
     # Generate embeddings
     print("🚀 Generating embeddings...")
-    print("   (This will make OpenAI API calls and may take a few seconds)")
+    print("   Using batch API for efficiency")
+    print("   Using question-like text format for better semantic matching")
     print()
 
     try:
-        stats = await kb_service.generate_embeddings(llm_service)
+        stats = await kb_service.generate_embeddings(
+            llm_service,
+            force_regenerate=force,
+            use_batch=True,
+        )
 
         print("=" * 70)
         print("✅ SUCCESS!")
@@ -160,11 +182,27 @@ async def main(force: bool = False):
         print(f"  • Total examples: {stats['total_examples']}")
         print(f"  • Embeddings generated: {stats['embeddings_generated']}")
         print(f"  • Embeddings skipped: {stats['embeddings_skipped']}")
+        print(f"  • Embeddings failed: {stats.get('embeddings_failed', 0)}")
         print(f"  • Embeddings available: {stats['embeddings_available']}")
+        print()
+        if stats.get('used_batch_api'):
+            print("  ⚡ Used batch API for faster generation")
+        if stats.get('tables_found'):
+            print(f"  📊 Tables referenced: {', '.join(stats['tables_found'][:10])}")
+            if len(stats['tables_found']) > 10:
+                print(f"     ... and {len(stats['tables_found']) - 10} more")
         print()
         print("Embeddings saved to: data/knowledge_base/embeddings.json")
         print()
         print("🎉 Your knowledge base is now ready for semantic search!")
+        print()
+        print("Text format used for embeddings:")
+        print("  'Question: [title]'")
+        print("  'Description: [description]'")
+        print("  'Tables involved: [extracted tables]'")
+        print("  'This query helps answer questions about: [title]'")
+        print()
+        print("This format better matches how users ask questions!")
         print()
         print("Next steps:")
         print("  1. Start/restart your backend server")
