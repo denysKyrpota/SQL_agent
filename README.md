@@ -19,7 +19,8 @@ A production-ready text-to-SQL application that converts natural language questi
 - 🎯 **Smart Schema Filtering** - Handles large databases (279+ tables) efficiently
 - 🔄 **Real-time Execution** - Execute generated SQL and view results instantly
 - 📥 **CSV Export** - Export query results with configurable limits
-- ☁️ **Azure OpenAI Support** - Works with both OpenAI and Azure OpenAI
+- ☁️ **Azure OpenAI Support** - Works with both OpenAI and Azure OpenAI (separate endpoints for chat/embeddings)
+- ⏳ **Progress Indicators** - Animated multi-stage loading with progress dots
 
 ## Architecture
 
@@ -138,12 +139,18 @@ OPENAI_MODEL=gpt-4
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_TEMPERATURE=0.0
 
-# OR Azure OpenAI Configuration
+# OR Azure OpenAI Configuration (Chat)
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 AZURE_OPENAI_API_KEY=your-azure-key
 AZURE_OPENAI_DEPLOYMENT=your-deployment-name
 AZURE_OPENAI_API_VERSION=2024-02-15-preview
 AZURE_OPENAI_SUPPORTS_TEMPERATURE=false  # Set true if your deployment supports it
+
+# Azure OpenAI Embeddings (optional - can use separate endpoint)
+AZURE_OPENAI_EMBEDDING_ENDPOINT=https://your-embedding-resource.openai.azure.com
+AZURE_OPENAI_EMBEDDING_API_KEY=your-embedding-key
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
 
 # Authentication
 SECRET_KEY=your-secret-key-here-change-in-production
@@ -193,13 +200,21 @@ ORDER BY last_login DESC;
 
 ### Generate Embeddings
 
-After adding knowledge base examples:
+After adding knowledge base examples, generate embeddings for semantic search:
 
 ```bash
-# Start the server, then:
-curl -X POST http://localhost:8000/api/admin/knowledge-base/embeddings/generate \
+# Option 1: Use the script (recommended)
+python scripts/generate_embeddings.py --force
+
+# Option 2: Use the API
+curl -X POST "http://localhost:8000/api/admin/embeddings/generate?force=true" \
   -H "Authorization: Bearer <admin_token>"
 ```
+
+The embedding system uses a question-like format for better semantic matching:
+- Extracts table names from SQL examples
+- Creates searchable text: "Question: [title], Tables: [tables]..."
+- Uses batch API for efficient generation
 
 ## Usage
 
