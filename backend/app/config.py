@@ -90,9 +90,28 @@ class Settings(BaseSettings):
     # Azure OpenAI deployment name for embeddings (optional, uses chat deployment if not set)
     azure_openai_embedding_deployment: str = ""
 
+    # Separate Azure OpenAI endpoint for embeddings (if different from chat endpoint)
+    # Use this when embeddings are on a different Azure resource
+    azure_openai_embedding_endpoint: str = ""
+
+    # Separate API key for embedding endpoint (if different from chat API key)
+    azure_openai_embedding_api_key: str = ""
+
+    # API version for embedding endpoint (if different from chat API version)
+    azure_openai_embedding_api_version: str = "2023-05-15"
+
     # Whether Azure deployment supports temperature parameter (many don't)
     # Set to False to skip temperature and avoid 400 errors on first request
     azure_openai_supports_temperature: bool = False
+
+    @property
+    def has_separate_embedding_endpoint(self) -> bool:
+        """Check if a separate embedding endpoint is configured."""
+        return bool(
+            self.azure_openai_embedding_endpoint
+            and self.azure_openai_embedding_api_key
+            and self.azure_openai_embedding_deployment
+        )
 
     @property
     def use_azure_openai(self) -> bool:

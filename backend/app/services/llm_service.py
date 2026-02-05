@@ -38,6 +38,7 @@ class LLMService:
         self.is_azure = settings.use_azure_openai
         # Use config setting for Azure temperature support (default False to avoid 400 errors)
         self._azure_supports_temperature = settings.azure_openai_supports_temperature
+        self.embedding_client = None  # Separate client for embeddings (if configured)
 
         if self.is_azure:
             # Azure OpenAI configuration
@@ -58,6 +59,19 @@ class LLMService:
                 logger.info(
                     f"LLM Service initialized with Azure OpenAI deployment: {self.model}"
                 )
+
+                # Check for separate embedding endpoint
+                if settings.has_separate_embedding_endpoint:
+                    self.embedding_client = AsyncAzureOpenAI(
+                        azure_endpoint=settings.azure_openai_embedding_endpoint,
+                        api_key=settings.azure_openai_embedding_api_key,
+                        api_version=settings.azure_openai_embedding_api_version,
+                    )
+                    self.embedding_model = settings.azure_openai_embedding_deployment
+                    logger.info(
+                        f"Embedding client initialized with separate Azure endpoint: "
+                        f"{settings.azure_openai_embedding_endpoint}"
+                    )
         else:
             # Standard OpenAI configuration
             self.model = settings.openai_model
@@ -948,6 +962,7 @@ Return ONLY the clarifying question:"""
 
         Used for RAG-based similarity search in knowledge base.
         Works with both standard OpenAI and Azure OpenAI.
+        Supports separate embedding endpoint for Azure deployments.
 
         Args:
             text: Text to generate embedding for (SQL query or question)
@@ -964,19 +979,29 @@ Return ONLY the clarifying question:"""
             >>> len(embedding)
             1536
         """
-        if not self.client:
-            raise LLMServiceUnavailableError("OpenAI API key not configured")
+        # Use separate embedding client if configured, otherwise use main client
+        client = self.embedding_client or self.client
 
-        logger.debug(f"Generating embedding for text ({len(text)} characters)")
+        if not client:
+            raise LLMServiceUnavailableError(
+                "No embedding client configured. Set AZURE_OPENAI_EMBEDDING_ENDPOINT, "
+                "AZURE_OPENAI_EMBEDDING_API_KEY, and AZURE_OPENAI_EMBEDDING_DEPLOYMENT "
+                "in your .env file."
+            )
+
+        logger.debug(
+            f"Generating embedding for text ({len(text)} characters) "
+            f"using {'separate embedding' if self.embedding_client else 'main'} client"
+        )
 
         try:
-            response = await self.client.embeddings.create(
+            response = await client.embeddings.create(
                 model=self.embedding_model, input=text
             )
 
             embedding = response.data[0].embedding
 
-            logger.debug(
+            logger.info(
                 f"Generated embedding: {len(embedding)} dimensions, "
                 f"{response.usage.total_tokens} tokens used"
             )
