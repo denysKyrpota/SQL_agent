@@ -149,6 +149,10 @@ class Settings(BaseSettings):
     # Allowed CORS origins (comma-separated string)
     cors_origins_str: str = "http://localhost:3000,http://localhost:5173"
 
+    # Serve frontend static files from frontend/dist/ (for production deployment)
+    # When True, FastAPI serves the built React app on all non-/api routes
+    serve_frontend: bool = False
+
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     log_level: str = "INFO"
 

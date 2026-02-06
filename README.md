@@ -100,27 +100,29 @@ make db-init
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start development server
-npm run dev
+npm run build       # Build for production
+cd ..
 ```
 
-### 4. Start Backend Server
+### 4. Start the Server
 
 ```bash
-# From project root
+# Set SERVE_FRONTEND=true in .env to serve frontend from FastAPI
+
+# Start the server (serves both API and frontend on port 8000)
 python -m backend.app.main
 
-# Or with auto-reload
+# Or with auto-reload for development
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+> **Development mode:** If you prefer separate servers, skip `SERVE_FRONTEND` and run
+> `npm run dev` in `frontend/` (Vite on port 3000) alongside the backend.
+
 ### 5. Access the Application
 
-- **Frontend:** http://localhost:5173
+- **Application:** http://localhost:8000
 - **API Docs:** http://localhost:8000/docs
 - **Default Login:** Use credentials created by `make db-init` (see setup instructions)
 
@@ -220,7 +222,7 @@ The embedding system uses a question-like format for better semantic matching:
 
 ### 1. Login
 
-Access http://localhost:5173 and login with your credentials.
+Access http://localhost:8000 and login with your credentials.
 
 ### 2. Ask Questions in Natural Language
 
@@ -298,7 +300,7 @@ pytest tests/ --cov=backend/app --cov-report=html
 pytest tests/api/test_auth.py::TestAuthLogin::test_login_success -v
 ```
 
-**Test Coverage:** 89% (179 tests)
+**Test Coverage:** 89% (187 tests)
 
 ### Code Quality
 
@@ -335,6 +337,7 @@ SQL_agent/
 │   ├── schema/               # PostgreSQL schema cache
 │   └── app_data/             # SQLite database
 ├── data_example/             # Example data structure
+├── deploy/                   # Deployment scripts and templates
 ├── migrations/               # SQL migration files
 ├── tests/                    # Test suite
 └── scripts/                  # Utility scripts
@@ -421,12 +424,50 @@ POST   /api/admin/knowledge-base/embeddings/generate
 
 ## Deployment
 
+### Single-Process Deployment (Recommended)
+
+FastAPI serves both API and frontend from a single process. No Nginx or Docker needed.
+
+```bash
+# On your Ubuntu server:
+
+# 1. Clone and set up
+git clone https://github.com/denysKyrpota/SQL_agent.git
+cd SQL_agent
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+
+# 2. Configure environment
+cp deploy/env.production.template .env
+nano .env  # Set POSTGRES_URL, OPENAI_API_KEY, SECRET_KEY
+
+# 3. Initialize database
+make db-init
+
+# 4. Build and start
+chmod +x deploy/build-and-start.sh
+./deploy/build-and-start.sh
+
+# 5. (Optional) Install as systemd service for auto-start
+chmod +x deploy/install-service.sh
+sudo ./deploy/install-service.sh install
+```
+
+### User Management
+
+```bash
+python scripts/manage_users.py list                    # List users
+python scripts/manage_users.py change-password admin   # Change password
+python scripts/manage_users.py create newuser --role admin  # Create user
+```
+
 ### Environment Variables
 
 Ensure all production credentials are set:
 - Change `SECRET_KEY` to a secure random value
+- Set `SERVE_FRONTEND=true` to serve frontend from FastAPI
 - Use production database URLs
-- Set appropriate CORS origins
+- Set `CORS_ORIGINS_STR` to your server's origin (e.g. `http://10.2.7.2:8000`)
 - Configure session expiration
 
 ### Database
@@ -437,14 +478,6 @@ make db-migrate
 
 # Create admin user (if not using db-init)
 python scripts/init_db.py --no-defaults
-```
-
-### Frontend Build
-
-```bash
-cd frontend
-npm run build
-# Deploy dist/ folder to your hosting service
 ```
 
 ## Troubleshooting

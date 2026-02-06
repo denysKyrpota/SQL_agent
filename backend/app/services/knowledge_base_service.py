@@ -383,7 +383,9 @@ class KnowledgeBaseService:
         if not embeddings_available or question_embedding is None:
             # Fallback: Return first examples without similarity ranking
             # This happens when question_embedding is not provided (embedding deployment not configured)
-            logger.debug(f"Using first {top_k} KB examples (no question embedding provided)")
+            logger.debug(
+                f"Using first {top_k} KB examples (no question embedding provided)"
+            )
             return examples[:top_k], 0.0
 
         # Calculate similarity scores for all examples
@@ -482,10 +484,10 @@ class KnowledgeBaseService:
         """
         # Match table names after FROM, JOIN, INTO, UPDATE keywords
         patterns = [
-            r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)',
-            r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)',
-            r'\bINTO\s+([a-zA-Z_][a-zA-Z0-9_]*)',
-            r'\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)',
+            r"\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            r"\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            r"\bINTO\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            r"\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)",
         ]
 
         tables = set()
@@ -588,10 +590,13 @@ This query helps answer questions about: {example.title.lower()}"""
                 "embeddings_skipped": embeddings_skipped,
                 "embeddings_failed": 0,
                 "embeddings_available": len(examples),
-                "tables_found": list(set(
-                    table for ex in examples
-                    for table in self._extract_tables_from_sql(ex.sql)
-                )),
+                "tables_found": list(
+                    set(
+                        table
+                        for ex in examples
+                        for table in self._extract_tables_from_sql(ex.sql)
+                    )
+                ),
             }
 
         logger.info(
@@ -612,7 +617,9 @@ This query helps answer questions about: {example.title.lower()}"""
         if use_batch and len(texts_to_embed) > 1:
             # Use batch API for efficiency
             try:
-                logger.info(f"Using batch API to generate {len(texts_to_embed)} embeddings")
+                logger.info(
+                    f"Using batch API to generate {len(texts_to_embed)} embeddings"
+                )
                 embeddings = await llm_service.generate_embeddings_batch(texts_to_embed)
 
                 # Assign embeddings to examples

@@ -371,3 +371,51 @@ All admin endpoints require admin role authentication.
 - Context-aware refinements: "add WHERE clause", "show only top 10"
 - Natural conversation flow without repeating full question
 - Enables iterative query development
+
+**Why single-process deployment?**
+- Simplest architecture: one process, one port, zero infrastructure
+- The bottleneck is OpenAI (2-10s per query), not static file serving
+- No Docker/Nginx needed; just Python + Node.js (for build step)
+- Adequate for 2-10 concurrent users (internal tool)
+
+## Production Deployment
+
+### Single-Process Mode
+
+Set `SERVE_FRONTEND=true` in `.env` to serve the built React app from FastAPI:
+
+```bash
+# Build frontend
+cd frontend && npm run build && cd ..
+
+# Start server (serves both API and frontend on port 8000)
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Deployment Scripts (Ubuntu)
+
+```bash
+deploy/build-and-start.sh          # Build frontend + start server
+deploy/build-and-start.sh --skip-build  # Start without rebuilding
+sudo deploy/install-service.sh install  # Install as systemd service
+sudo deploy/install-service.sh remove   # Remove service
+deploy/install-service.sh status        # Check service status
+deploy/install-service.sh logs          # Tail service logs
+```
+
+### User Management
+
+```bash
+python scripts/manage_users.py list                        # List all users
+python scripts/manage_users.py change-password <username>  # Change password
+python scripts/manage_users.py create <username> --role admin  # Create user
+```
+
+### Key Settings for Production
+
+```bash
+SERVE_FRONTEND=true                          # Serve frontend from FastAPI
+CORS_ORIGINS_STR=http://your-server:8000     # Your server's origin
+SECRET_KEY=<random-hex-string>               # python -c "import secrets; print(secrets.token_hex(32))"
+ENVIRONMENT=production
+```

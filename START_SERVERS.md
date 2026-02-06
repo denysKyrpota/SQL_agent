@@ -1,6 +1,22 @@
-# 🚀 Start Servers for E2E Testing
+# 🚀 Start Servers
 
-## Quick Reference
+## Production Mode (Single Process)
+
+With `SERVE_FRONTEND=true` in `.env`, one process serves everything on port 8000:
+
+```bash
+# Build frontend + start
+./deploy/build-and-start.sh
+
+# Or if using systemd service
+sudo systemctl start sqlaiagent
+```
+
+Access at: `http://<server-ip>:8000`
+
+---
+
+## Development Mode (E2E Testing)
 
 You need **3 terminals** open:
 

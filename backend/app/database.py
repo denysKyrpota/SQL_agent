@@ -8,7 +8,6 @@ import logging
 from typing import Generator
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.config import get_settings
@@ -35,7 +34,7 @@ engine = create_engine(
 def set_sqlite_pragma(dbapi_conn, connection_record):
     """Enable foreign key constraints for SQLite connections."""
     # Check if this is actually a SQLite connection
-    if hasattr(dbapi_conn, 'execute'):
+    if hasattr(dbapi_conn, "execute"):
         try:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
