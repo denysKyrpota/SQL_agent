@@ -12,11 +12,15 @@ This module initializes the FastAPI application with:
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api import queries
+from backend.app.config import get_settings
 
 # Configure logging
 logging.basicConfig(
@@ -80,13 +84,12 @@ app = FastAPI(
 # Middleware Configuration
 # ============================================================================
 
-# CORS Configuration for frontend communication
+# CORS Configuration - uses CORS_ORIGINS_STR from settings (.env)
+settings = get_settings()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React development server
-        "http://localhost:5173",  # Vite development server (alternative)
-    ],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,  # Allow cookies for session authentication
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Content-Type", "Authorization"],
@@ -153,24 +156,46 @@ app.include_router(admin.router, prefix="/api", tags=["Admin"])
 
 
 # ============================================================================
-# Root Endpoint
+# Static File Serving (Production Deployment)
 # ============================================================================
 
+if settings.serve_frontend:
+    frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if frontend_dist.exists():
+        logger.info(f"Serving frontend from {frontend_dist}")
+        app.mount(
+            "/assets",
+            StaticFiles(directory=frontend_dist / "assets"),
+            name="static-assets",
+        )
 
-@app.get("/", include_in_schema=False)
-async def root():
-    """
-    Root endpoint - redirects to API documentation.
+        @app.get("/{path:path}", include_in_schema=False)
+        async def serve_spa(path: str):
+            """Serve the React SPA. Returns index.html for all non-API, non-asset routes."""
+            file = frontend_dist / path
+            if file.exists() and file.is_file():
+                return FileResponse(file)
+            return FileResponse(frontend_dist / "index.html")
+    else:
+        logger.warning(
+            f"SERVE_FRONTEND=true but {frontend_dist} not found. "
+            "Run 'npm run build' in frontend/ first."
+        )
 
-    Returns:
-        Simple welcome message with links to documentation
-    """
-    return {
-        "message": "SQL AI Agent API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "redoc": "/redoc",
-    }
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return {"error": "Frontend not built. Run 'npm run build' in frontend/."}
+else:
+
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Root endpoint - API info when frontend serving is disabled."""
+        return {
+            "message": "SQL AI Agent API",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "redoc": "/redoc",
+        }
 
 
 # ============================================================================
