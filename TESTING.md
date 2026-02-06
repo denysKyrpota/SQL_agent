@@ -220,7 +220,10 @@ curl -X POST http://localhost:8000/api/queries \
 
 **Purpose**: Verify CORS is configured for frontend
 
+CORS origins are configured via `CORS_ORIGINS_STR` in `.env` (default: `http://localhost:3000,http://localhost:5173`).
+
 ```bash
+# Use one of the origins from your CORS_ORIGINS_STR setting
 curl -X OPTIONS http://localhost:8000/api/queries \
   -H "Origin: http://localhost:3000" \
   -H "Access-Control-Request-Method: POST" \
@@ -426,12 +429,13 @@ uvicorn backend.app.main:app --port 8001
 
 **Symptom**: Browser shows CORS error when calling from React
 
-**Solution**: Verify frontend URL in `main.py`:
-```python
-allow_origins=[
-    "http://localhost:3000",  # React dev server
-    "http://localhost:5173",  # Vite dev server
-]
+**Solution**: Verify `CORS_ORIGINS_STR` in `.env` includes your frontend origin:
+```bash
+# Default (development)
+CORS_ORIGINS_STR=http://localhost:3000,http://localhost:5173
+
+# Production (single-process, same origin)
+CORS_ORIGINS_STR=http://your-server:8000
 ```
 
 ---
