@@ -692,7 +692,9 @@ class ChatService:
         db.refresh(query_attempt)
 
         # Step 5: Create assistant message with SQL
-        assistant_content = f"I've generated the following SQL query:\n\n```sql\n{example.sql}\n```"
+        assistant_content = (
+            f"I've generated the following SQL query:\n\n```sql\n{example.sql}\n```"
+        )
 
         assistant_message = Message(
             conversation_id=conversation.id,

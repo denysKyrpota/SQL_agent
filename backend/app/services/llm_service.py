@@ -346,7 +346,11 @@ Example: activity_activity, asset_truck, asset_assignment"""
                 return sql
 
             # Check if error is already a clarification question from LLM
-            if error_msg and "?" in error_msg and not error_msg.startswith("I couldn't"):
+            if (
+                error_msg
+                and "?" in error_msg
+                and not error_msg.startswith("I couldn't")
+            ):
                 # LLM asked a clarifying question - pass it through
                 logger.info(f"LLM requested clarification: {error_msg[:100]}")
                 raise ValueError(error_msg)
@@ -470,7 +474,9 @@ DO NOT ask clarifying questions for simple requests like:
                     n in col_name.lower()
                     for n in ["name", "code", "number", "plate", "identifier"]
                 ):
-                    entity = current_table.split("_")[-1]  # e.g., "asset_driver" -> "driver"
+                    entity = current_table.split("_")[
+                        -1
+                    ]  # e.g., "asset_driver" -> "driver"
                     name_columns.append(f"{entity}.{col_name}")
 
         # Create a summary of searchable entities
@@ -890,8 +896,18 @@ Return ONLY the clarifying question:"""
             logger.error(f"Response doesn't start with SELECT or WITH: {cleaned[:100]}")
 
             # Check if LLM is asking a clarifying question or providing explanation
-            question_patterns = ["?", "could you", "can you", "what do you mean", "clarify", "please provide", "i need more"]
-            is_clarification = any(p in response_text.lower() for p in question_patterns)
+            question_patterns = [
+                "?",
+                "could you",
+                "can you",
+                "what do you mean",
+                "clarify",
+                "please provide",
+                "i need more",
+            ]
+            is_clarification = any(
+                p in response_text.lower() for p in question_patterns
+            )
 
             if is_clarification:
                 # LLM is asking for clarification - return it as a friendly message
@@ -1066,7 +1082,9 @@ Return ONLY the clarifying question:"""
             batch_num = i // batch_size + 1
             total_batches = (len(texts) + batch_size - 1) // batch_size
 
-            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} texts)")
+            logger.info(
+                f"Processing batch {batch_num}/{total_batches} ({len(batch)} texts)"
+            )
 
             try:
                 response = await client.embeddings.create(

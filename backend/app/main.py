@@ -176,6 +176,7 @@ if settings.serve_frontend:
             if file.exists() and file.is_file():
                 return FileResponse(file)
             return FileResponse(frontend_dist / "index.html")
+
     else:
         logger.warning(
             f"SERVE_FRONTEND=true but {frontend_dist} not found. "
@@ -185,6 +186,7 @@ if settings.serve_frontend:
         @app.get("/", include_in_schema=False)
         async def root():
             return {"error": "Frontend not built. Run 'npm run build' in frontend/."}
+
 else:
 
     @app.get("/", include_in_schema=False)
